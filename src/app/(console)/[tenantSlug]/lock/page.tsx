@@ -34,7 +34,11 @@ export default async function StaffLockPage({ params, searchParams }: RouteParam
   // `//evil.example` also starts with `/` but browsers resolve it as
   // protocol-relative (effectively `https://evil.example`) -- the second
   // check is the one that actually matters here.
-  const nextPath = next && next.startsWith('/') && !next.startsWith('//') ? next : `/${tenantSlug}/kds`;
+  //
+  // `null` when there is no safe explicit destination: the login view
+  // then routes by the authenticated member's ROLE (a cashier who opens
+  // /lock directly should land on the Cashier dashboard, not the KDS).
+  const nextPath = next && next.startsWith('/') && !next.startsWith('//') ? next : null;
 
   return <StaffLoginView tenantSlug={tenantSlug} nextPath={nextPath} />;
 }

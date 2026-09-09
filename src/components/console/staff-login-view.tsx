@@ -3,7 +3,7 @@
 /**
  * src/components/console/staff-login-view.tsx
  *
- * The real staff login flow: staff code, then a 4-digit PIN, POSTed to
+ * The real staff login flow: staff code, then a 4-6 digit PIN, POSTed to
  * `/api/auth/pin`; on success, `signInWithCustomToken` establishes the
  * browser's Firestore-facing auth state, and the staff session cookie
  * the API route already set carries the visit forward across
@@ -24,8 +24,31 @@ import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { signInWithCustomToken } from 'firebase/auth';
 import { auth } from '@/lib/firebase/client';
+import type { StaffRole } from '@/types/firestore';
 
-const PIN_LENGTH = 4;
+// Staff PINs are 4-8 digits server-side (`/^\d{4,8}$/`); owners/managers
+// use 6. This screen can't know a member's PIN length before auth
+// (revealing it would be an oracle), so it accepts a variable entry of
+// MIN..MAX digits -- submitted explicitly, or auto-submitted on MAX.
+const MIN_PIN = 4;
+const MAX_PIN = 6;
+
+/** Where a freshly-signed-in member lands when the visit carried no safe
+ *  explicit `?next=` -- their own role's home surface. */
+function roleHome(tenantSlug: string, role: StaffRole): string {
+  switch (role) {
+    case 'cashier':
+      return `/${tenantSlug}/cashier`;
+    case 'server':
+      return `/${tenantSlug}/floor`;
+    case 'manager':
+    case 'owner':
+      return `/${tenantSlug}/manager`;
+    case 'kitchen':
+    default:
+      return `/${tenantSlug}/kds`;
+  }
+}
 
 type Step = 'staffCode' | 'pin';
 type SubmitState = { status: 'idle' } | { status: 'submitting' } | { status: 'error'; message: string };
@@ -35,7 +58,14 @@ function lockoutMessage(retryAfterMs: number): string {
   return `Too many attempts. Try again in ${minutes} minute${minutes === 1 ? '' : 's'}.`;
 }
 
-export function StaffLoginView({ tenantSlug, nextPath }: { tenantSlug: string; nextPath: string }) {
+export function StaffLoginView({
+  tenantSlug,
+  nextPath,
+}: {
+  tenantSlug: string;
+  /** A safe, same-origin destination from `?next=`, or `null` to route by role. */
+  nextPath: string | null;
+}) {
   const router = useRouter();
   const [step, setStep] = useState<Step>('staffCode');
   const [staffCode, setStaffCode] = useState('');
@@ -83,7 +113,10 @@ export function StaffLoginView({ tenantSlug, nextPath }: { tenantSlug: string; n
       return;
     }
 
-    const data = (await response.json()) as { customToken: string };
+    const data = (await response.json()) as {
+      customToken: string;
+      member: { displayName: string; role: StaffRole };
+    };
 
     try {
       await signInWithCustomToken(auth, data.customToken);
@@ -93,18 +126,19 @@ export function StaffLoginView({ tenantSlug, nextPath }: { tenantSlug: string; n
       return;
     }
 
-    // Full navigation (not a soft client-side transition) so
-    // middleware re-evaluates the now-set staff cookie against the
-    // originally-requested console route.
-    router.push(nextPath);
+    // Full navigation (not a soft client-side transition) so middleware
+    // re-evaluates the now-set staff cookie against the destination.
+    // An explicit `?next=` (a middleware bounce from a specific console
+    // route) wins; otherwise land the member on their role's home.
+    router.push(nextPath ?? roleHome(tenantSlug, data.member.role));
   }
 
   function handleDigit(digit: string) {
     if (submitState.status === 'submitting') return;
     setSubmitState({ status: 'idle' });
-    const next = (pin + digit).slice(0, PIN_LENGTH);
+    const next = (pin + digit).slice(0, MAX_PIN);
     setPin(next);
-    if (next.length === PIN_LENGTH) {
+    if (next.length === MAX_PIN) {
       void submitPin(next);
     }
   }
@@ -121,7 +155,7 @@ export function StaffLoginView({ tenantSlug, nextPath }: { tenantSlug: string; n
         <p className="text-sm font-semibold uppercase tracking-wide text-[#6B7280]">Secure Terminal</p>
         <h1 className="mt-1 text-xl font-bold text-[#1F2937]">{tenantSlug}</h1>
         <p className="mt-1 text-sm text-[#6B7280]">
-          {step === 'staffCode' ? 'Enter your staff code' : 'Enter your 4-digit PIN'}
+          {step === 'staffCode' ? 'Enter your staff code' : `Enter your PIN (${MIN_PIN}–${MAX_PIN} digits)`}
         </p>
       </div>
 
@@ -146,11 +180,15 @@ export function StaffLoginView({ tenantSlug, nextPath }: { tenantSlug: string; n
       ) : (
         <>
           <div className="flex gap-3" aria-live="polite">
-            {Array.from({ length: PIN_LENGTH }).map((_, index) => (
+            {Array.from({ length: MAX_PIN }).map((_, index) => (
               <span
                 key={index}
                 className={`h-4 w-4 rounded-full border-2 ${
-                  index < pin.length ? 'border-[#0F5257] bg-[#0F5257]' : 'border-[#D1D5DB] bg-transparent'
+                  index < pin.length
+                    ? 'border-[#0F5257] bg-[#0F5257]'
+                    : index < MIN_PIN
+                      ? 'border-[#D1D5DB] bg-transparent'
+                      : 'border-dashed border-[#D1D5DB] bg-transparent'
                 }`}
               />
             ))}
@@ -193,6 +231,17 @@ export function StaffLoginView({ tenantSlug, nextPath }: { tenantSlug: string; n
               ⌫
             </button>
           </div>
+
+          {/* Explicit submit for 4- and 5-digit PINs; a 6-digit PIN
+              auto-submits on the last digit. */}
+          <button
+            type="button"
+            onClick={() => void submitPin(pin)}
+            disabled={submitState.status === 'submitting' || pin.length < MIN_PIN}
+            className="flex h-12 w-full max-w-[13.5rem] items-center justify-center rounded-lg bg-[#0F5257] text-sm font-semibold text-white active:scale-[0.98] disabled:opacity-40"
+          >
+            {submitState.status === 'submitting' ? 'Signing in…' : 'Sign in'}
+          </button>
         </>
       )}
 

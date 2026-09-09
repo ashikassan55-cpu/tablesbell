@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "seed:staff": "tsx scripts/seed-staff-member.ts"
+    "seed:staff": "tsx scripts/seed-staff-member.ts",
+    "seed:demo": "tsx scripts/seed-demo.ts"
   },
   "dependencies": {
     "firebase": "^11.1.0",
