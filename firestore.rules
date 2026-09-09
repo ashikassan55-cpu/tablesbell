@@ -262,6 +262,24 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Public marketing lead capture -- the landing page's "Book a demo"
+    // form (src/components/marketing/demo-form.tsx). Anyone (unauthenticated)
+    // may CREATE exactly one strictly-shaped, size-bounded document; nobody
+    // reads, edits or deletes via a client. An operator reads these with
+    // the Admin SDK -- there is no in-app lead inbox yet.
+    match /demoLeads/{leadId} {
+      allow read, update, delete: if false;
+      allow create: if request.resource.data.keys().hasOnly(
+                         ['venueName', 'contactName', 'phone', 'emirate', 'tableRange', 'source', 'createdAt'])
+                     && safeText(request.resource.data.venueName, 120)
+                     && safeText(request.resource.data.contactName, 120)
+                     && safeText(request.resource.data.phone, 40)
+                     && safeText(request.resource.data.emirate, 40)
+                     && safeText(request.resource.data.tableRange, 40)
+                     && request.resource.data.source == 'landing'
+                     && request.resource.data.createdAt == request.time;
+    }
+
     // -------------------------------------------------------------------
     // TENANT -- hierarchical multi-tenancy root, Section 1.1-1.3
     // -------------------------------------------------------------------

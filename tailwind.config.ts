@@ -98,16 +98,15 @@ const config: Config = {
         },
       },
 
-      // Declared, but currently inert: no font is actually LOADED until
-      // the not-yet-built root layout (app/layout.tsx -- see this same
-      // pass's minimal placeholder) wires these up via `next/font` and
-      // applies the resulting className. Until then these fall back to
-      // the browser default sans stack, same as every screen renders
-      // today. Names match RULES.md §3's guest ("Plus Jakarta Sans
-      // headings, Inter body") and ops ("Inter throughout") requirement.
+      // Loaded for real now: `app/layout.tsx` pulls both families via
+      // `next/font/google` and sets `--font-heading` / `--font-body` on
+      // <html>. These stacks lead with those CSS variables and keep the
+      // named-family + system fallbacks for the pre-swap flash. Names
+      // match RULES.md §3's guest ("Plus Jakarta Sans headings, Inter
+      // body") and ops ("Inter throughout") requirement.
       fontFamily: {
-        heading: ['"Plus Jakarta Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-        body: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        heading: ['var(--font-heading)', '"Plus Jakarta Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        body: ['var(--font-body)', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
     },
   },
