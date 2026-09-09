@@ -1,0 +1,11 @@
+# A genuinely separate package from the root app -- see functions/README.md.
+# The root .gitignore's `/node_modules` is anchored to the repo root only
+# and does not reach this directory's own node_modules, hence a dedicated
+# file here rather than adding functions-specific entries to the root one.
+
+node_modules/
+lib/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example

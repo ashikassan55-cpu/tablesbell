@@ -1,0 +1,32 @@
+// functions/tsconfig.json
+//
+// rootDir/outDir are relative to THIS file's own directory (functions/).
+// `rootDir: ".."` is the one genuinely unusual choice here -- see
+// functions/README.md for why it has to reach outside this directory at
+// all (importing `order.service.ts` from `../src/server/services/`) and
+// what that does to the compiled output layout (`functions/package.json`'s
+// `main` field points at the resulting nested path).
+//
+// NOTE: TypeScript's tsconfig.json parser accepts `//` comments like this
+// one -- a JSON5-ish superset, not strict JSON. `firestore.indexes.json`
+// (a Firebase CLI file, strictly validated) does NOT get this same
+// treatment; do not copy this pattern there.
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "lib": ["es2022"],
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmitOnError": true,
+    "sourceMap": true,
+    "outDir": "lib",
+    "rootDir": ".."
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "lib"]
+}

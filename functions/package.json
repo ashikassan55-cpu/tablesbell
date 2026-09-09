@@ -1,0 +1,25 @@
+{
+  "name": "tablebells-functions",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TableBells Cloud Functions v2 -- currently just the orderRequests pricing trigger. A genuinely separate npm package from the root Next.js app (its own node_modules, its own deploy target), NOT a workspace of it -- Firebase Functions deployment packages up exactly this directory.",
+  "engines": {
+    "node": "20"
+  },
+  "main": "lib/functions/src/index.js",
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "serve": "npm run build && firebase emulators:start --only functions",
+    "shell": "npm run build && firebase functions:shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0",
+    "firebase-functions": "^5.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}

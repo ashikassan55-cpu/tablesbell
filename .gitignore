@@ -1,0 +1,18 @@
+# dependencies
+/node_modules
+
+# Next.js build output
+/.next/
+/out/
+
+# env -- .env.local holds real secrets once populated; never commit it
+.env*.local
+
+# misc
+.DS_Store
+*.pem
+npm-debug.log*
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
