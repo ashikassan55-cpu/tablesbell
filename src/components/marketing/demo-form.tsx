@@ -9,12 +9,18 @@
  * strictly-shaped, size-bounded payload and nothing else (no read, no
  * update, no delete). An operator reads these with the Admin SDK; there
  * is no in-app lead inbox yet.
+ *
+ * Firebase is imported LAZILY, inside the submit handler -- `lib/firebase/
+ * client.ts` throws at module load when the `NEXT_PUBLIC_FIREBASE_*` env
+ * vars are missing, and this landing page is statically prerendered at
+ * build time. A top-level import would take the whole marketing home page
+ * down whenever that config isn't present (e.g. a first Vercel deploy).
+ * Deferring it keeps `/` buildable and rendering; only an actual form
+ * submission needs the config.
  */
 
 import { useState, type FormEvent } from 'react';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { CheckCircle2, Loader2 } from 'lucide-react';
-import { db } from '@/lib/firebase/client';
 
 const EMIRATES = [
   'Dubai',
@@ -54,6 +60,10 @@ export function DemoForm() {
 
     setState({ status: 'submitting' });
     try {
+      const [{ addDoc, collection, serverTimestamp }, { db }] = await Promise.all([
+        import('firebase/firestore'),
+        import('@/lib/firebase/client'),
+      ]);
       await addDoc(collection(db, 'demoLeads'), {
         venueName: venueName.slice(0, 120),
         contactName: contactName.slice(0, 120),
