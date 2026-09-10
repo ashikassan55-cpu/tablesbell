@@ -27,6 +27,22 @@ interface TablesManagerViewProps {
   restaurantName: string;
 }
 
+/** Common floor sections offered as type-ahead suggestions; the field
+ *  still accepts any free-text value. */
+const ZONE_PRESETS = [
+  'Indoor',
+  'Outdoor',
+  'Bar',
+  'Cafe',
+  'Terrace',
+  'Patio',
+  'Rooftop',
+  'Garden',
+  'Lounge',
+  'Private Room',
+  'Counter',
+];
+
 type EditTarget = 'new' | TableWithId;
 
 interface FormState {
@@ -312,13 +328,19 @@ export function TablesManagerView({ tenantId, branchId, appUrl, restaurantName }
               </label>
               <div className="flex gap-2">
                 <label className="flex flex-1 flex-col text-xs text-[#6B7280]">
-                  Zone / section
+                  Location / section
                   <input
                     value={form.zoneId}
                     onChange={(e) => setForm((f) => ({ ...f, zoneId: e.target.value }))}
-                    placeholder="Terrace"
+                    list="table-zone-presets"
+                    placeholder="Indoor / Outdoor / Bar…"
                     className="mt-0.5 h-10 rounded-md border border-[#E5E7EB] px-2 text-sm text-[#1F2937]"
                   />
+                  <datalist id="table-zone-presets">
+                    {ZONE_PRESETS.map((z) => (
+                      <option key={z} value={z} />
+                    ))}
+                  </datalist>
                 </label>
                 <label className="flex w-24 flex-col text-xs text-[#6B7280]">
                   Capacity

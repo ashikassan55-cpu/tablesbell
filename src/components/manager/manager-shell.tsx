@@ -42,6 +42,7 @@ export function ManagerShell({
   branchName,
   statusRight,
   title,
+  subNav,
   children,
 }: {
   tenantSlug: string;
@@ -53,6 +54,9 @@ export function ManagerShell({
   /** Page heading shown above the content (the overview dashboard sets
    *  its own, so it leaves this unset). */
   title?: string;
+  /** Optional segmented sub-navigation shown under the title — used to
+   *  split a single sidebar entry (e.g. "Staff & Tables") into its pages. */
+  subNav?: { label: string; href: string; current: boolean }[];
   children: ReactNode;
 }) {
   return (
@@ -137,6 +141,24 @@ export function ManagerShell({
         <main className="mx-auto max-w-[1180px] px-6 py-6">
           {title ? (
             <h1 className="mb-4 text-xl font-bold tracking-tight text-[#1F2937]">{title}</h1>
+          ) : null}
+          {subNav && subNav.length > 0 ? (
+            <div className="mb-4 inline-flex gap-1 rounded-lg bg-[#E5E7EB] p-1">
+              {subNav.map((s) => (
+                <Link
+                  key={s.href}
+                  href={s.href}
+                  aria-current={s.current ? 'page' : undefined}
+                  className={`rounded-md px-3 py-1.5 text-sm font-semibold transition-colors ${
+                    s.current
+                      ? 'bg-white text-[#0F5257] shadow-sm'
+                      : 'text-[#4B5563] hover:text-[#1F2937]'
+                  }`}
+                >
+                  {s.label}
+                </Link>
+              ))}
+            </div>
           ) : null}
           {children}
         </main>

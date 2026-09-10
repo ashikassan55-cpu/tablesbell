@@ -36,6 +36,10 @@ export default async function ManagerTablesPage({
       role={session.role}
       active="staff-tables"
       title="Tables & QR codes"
+      subNav={[
+        { label: 'Staff', href: `/${tenantSlug}/manager/staff`, current: false },
+        { label: 'Tables & QR codes', href: `/${tenantSlug}/manager/tables`, current: true },
+      ]}
     >
       {body}
     </ManagerShell>
