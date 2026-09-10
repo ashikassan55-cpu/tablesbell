@@ -3,17 +3,40 @@
 /**
  * src/components/platform/platform-login-form.tsx
  *
- * Founder sign-in: Firebase email/password → ID token → POST
- * /api/admin/session (which verifies the token AND the `plat: true`
- * claim, then sets the `tb_platform` cookie) → hard nav to the console.
+ * Founder sign-in — Google only. `signInWithPopup` (client-side Firebase
+ * Google Auth) → ID token → POST /api/admin/session, which checks the
+ * token's email against `ADMIN_EMAIL` and, on a match, sets the
+ * `tb_platform` cookie. No password, no custom claim, no CLI grant step:
+ * the allowlist IS the gate.
+ *
  * Firebase is imported lazily so a missing NEXT_PUBLIC_FIREBASE_* config
- * can't take the /admin/login route's build down (same reasoning as the
- * marketing demo form).
+ * can't take the /admin/login route's build down.
  */
 
-import { useState, type FormEvent } from 'react';
+import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, ShieldCheck } from 'lucide-react';
+
+const GoogleMark = () => (
+  <svg viewBox="0 0 48 48" className="h-4 w-4" aria-hidden="true">
+    <path
+      fill="#EA4335"
+      d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+    />
+    <path
+      fill="#4285F4"
+      d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
+    />
+    <path
+      fill="#FBBC05"
+      d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
+    />
+    <path
+      fill="#34A853"
+      d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+    />
+  </svg>
+);
 
 export function PlatformLoginForm() {
   const router = useRouter();
@@ -25,38 +48,54 @@ export function PlatformLoginForm() {
     status: 'idle',
   });
 
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    const email = String(data.get('email') ?? '').trim();
-    const password = String(data.get('password') ?? '');
-    if (!email || !password) {
-      setState({ status: 'error', message: 'Enter your email and password.' });
-      return;
-    }
-
+  async function signIn() {
     setState({ status: 'busy' });
     try {
-      const [{ signInWithEmailAndPassword, getIdToken }, { auth }] = await Promise.all([
+      const [{ GoogleAuthProvider, signInWithPopup, signOut }, { auth }] = await Promise.all([
         import('firebase/auth'),
         import('@/lib/firebase/client'),
       ]);
-      const cred = await signInWithEmailAndPassword(auth, email, password);
-      const idToken = await getIdToken(cred.user, true);
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
 
+      let cred;
+      try {
+        cred = await signInWithPopup(auth, provider);
+      } catch (e) {
+        const code = (e as { code?: string })?.code ?? '';
+        if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+          setState({ status: 'idle' });
+          return;
+        }
+        setState({ status: 'error', message: 'Google sign-in was blocked. Allow pop-ups and try again.' });
+        return;
+      }
+
+      const idToken = await cred.user.getIdToken(true);
       const res = await fetch('/api/admin/session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ idToken }),
       });
+
       if (!res.ok) {
-        setState({ status: 'error', message: 'That account is not a founder account.' });
+        // Rejected account — don't leave it signed in on this device.
+        try {
+          await signOut(auth);
+        } catch {
+          /* ignore */
+        }
+        setState({
+          status: 'error',
+          message: 'This Google account is not authorised for the founder console.',
+        });
         return;
       }
+
       router.push(dest);
       router.refresh();
     } catch {
-      setState({ status: 'error', message: 'Email or password not recognised.' });
+      setState({ status: 'error', message: 'Could not complete sign-in. Try again.' });
     }
   }
 
@@ -75,47 +114,30 @@ export function PlatformLoginForm() {
           </p>
         </div>
 
-        <form
-          onSubmit={onSubmit}
-          className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-[#2A2422] p-6"
-        >
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-semibold text-[#C9BDB8]">Email</span>
-            <input
-              name="email"
-              type="email"
-              autoComplete="username"
-              autoFocus
-              className="rounded-lg border border-white/10 bg-[#1E1B19] px-3 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#E85D3F]"
-            />
-          </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-semibold text-[#C9BDB8]">Password</span>
-            <input
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              className="rounded-lg border border-white/10 bg-[#1E1B19] px-3 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#E85D3F]"
-            />
-          </label>
+        <div className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-[#2A2422] p-6">
+          <p className="text-sm text-[#C9BDB8]">
+            Sign in with the Google account authorised for this platform.
+          </p>
+
+          <button
+            type="button"
+            onClick={signIn}
+            disabled={busy}
+            className="flex items-center justify-center gap-2.5 rounded-lg bg-white px-4 py-2.5 text-sm font-bold text-[#1E1B19] transition-opacity hover:opacity-90 disabled:opacity-60"
+          >
+            {busy ? <Loader2 className="h-4 w-4 animate-spin text-[#8D716B]" /> : <GoogleMark />}
+            {busy ? 'Signing in…' : 'Sign in with Google'}
+          </button>
 
           {state.status === 'error' ? (
             <p role="alert" className="text-sm font-semibold text-[#F87171]">
               {state.message}
             </p>
           ) : null}
+        </div>
 
-          <button
-            type="submit"
-            disabled={busy}
-            className="mt-1 flex items-center justify-center gap-2 rounded-lg bg-[#E85D3F] px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-[#d24e33] disabled:opacity-60"
-          >
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            {busy ? 'Signing in…' : 'Sign in'}
-          </button>
-        </form>
         <p className="mt-4 text-center text-xs text-[#8D716B]">
-          Access is limited to accounts granted the platform claim.
+          Access is limited to one allowlisted Google account.
         </p>
       </div>
     </div>

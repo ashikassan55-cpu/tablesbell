@@ -11,7 +11,6 @@
     "typecheck": "tsc --noEmit",
     "seed:staff": "tsx scripts/seed-staff-member.ts",
     "seed:demo": "tsx scripts/seed-demo.ts",
-    "grant:admin": "tsx scripts/grant-platform-admin.ts",
     "backfill:demo": "tsx scripts/backfill-demo-tenant.ts"
   },
   "dependencies": {

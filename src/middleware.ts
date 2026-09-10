@@ -72,9 +72,9 @@ export async function middleware(request: NextRequest) {
 
 /**
  * `/admin/*` is the founder super-admin console. Gated on the
- * `tb_platform` cookie (`/api/admin/session` sets it after a Firebase
- * email/password sign-in whose token carries `plat: true`). `/admin/login`
- * is exempt from the redirect for the same anti-loop reason `/lock` is on
+ * `tb_platform` cookie (`/api/admin/session` sets it after a Google
+ * sign-in whose verified email matches `ADMIN_EMAIL`). `/admin/login` is
+ * exempt from the redirect for the same anti-loop reason `/lock` is on
  * the console side. Guest device cookies are cleared here too — a founder
  * laptop must never carry a `tb_did`.
  */

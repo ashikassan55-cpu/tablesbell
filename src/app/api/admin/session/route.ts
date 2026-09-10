@@ -1,17 +1,18 @@
 /**
  * src/app/api/admin/session/route.ts
  *
- * Exchanges a Firebase Auth ID token (from the founder's email/password
- * sign-in on `/admin/login`) for the `tb_platform` session cookie
- * `middleware.ts` gates `/admin/*` on. This is the one place the Admin
- * SDK check that can't run on Edge happens: `verifyIdToken` + assert the
- * `plat: true` custom claim (granted once by
- * `scripts/grant-platform-admin.ts`). A valid Firebase user WITHOUT that
- * claim is rejected exactly like a bad password — this endpoint is the
- * whole gate between "has a Google/Firebase account" and "is the founder".
+ * Exchanges a Firebase Auth ID token (from the founder's Google sign-in
+ * on `/admin/login`) for the `tb_platform` session cookie that
+ * `middleware.ts` gates `/admin/*` on.
  *
- * Node runtime (Route Handlers default to Node) — `firebase-admin` is
- * fine here.
+ * THE GATE IS AN EMAIL ALLOWLIST (DECISIONS.md ADR-12, revised): the
+ * token must be a verified Google identity whose email equals
+ * `ADMIN_EMAIL` (falling back to the founder's address if the env var is
+ * unset). No password, no `plat` custom claim, no CLI grant script — a
+ * valid Firebase user whose email isn't on the list is rejected exactly
+ * like a bad token.
+ *
+ * Node runtime (Route Handlers default to Node) — `firebase-admin` fine.
  */
 
 import { NextResponse, type NextRequest } from 'next/server';
@@ -21,6 +22,8 @@ import {
   PLATFORM_SESSION_COOKIE_NAME,
   PLATFORM_SESSION_COOKIE_OPTIONS,
 } from '@/server/auth/platform-session-cookie';
+
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL ?? 'ashikassan55@gmail.com').trim().toLowerCase();
 
 export async function POST(request: NextRequest) {
   let body: unknown;
@@ -41,10 +44,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ outcome: 'denied' }, { status: 401 });
   }
 
-  if (decoded.plat !== true || decoded.firebase?.sign_in_provider === 'anonymous') {
-    // Uniform failure — don't tell a probing account that it exists but
-    // lacks the claim vs. that the password was wrong.
-    return NextResponse.json({ outcome: 'denied' }, { status: 401 });
+  const email = typeof decoded.email === 'string' ? decoded.email.trim().toLowerCase() : '';
+  const emailVerified = decoded.email_verified === true;
+  const provider = decoded.firebase?.sign_in_provider;
+
+  // Verified Google identity, on the allowlist. Uniform 401 for every
+  // other case — no oracle for "account exists but isn't the founder".
+  if (provider !== 'google.com' || !emailVerified || !email || email !== ADMIN_EMAIL) {
+    return NextResponse.json({ outcome: 'denied', message: 'Unauthorized.' }, { status: 401 });
   }
 
   const token = await signPlatformSessionToken({

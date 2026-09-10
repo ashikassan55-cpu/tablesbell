@@ -4,10 +4,10 @@
  * The founder / super-admin counterpart to `staff-session-cookie.ts`.
  * Same shape, same reasoning: a `jose` HS256 JWT (Edge-verifiable, so
  * `middleware.ts` can gate `/admin/*` without pulling in `firebase-admin`),
- * set as an httpOnly cookie after the founder proves a Firebase Auth
- * email/password identity carrying the `plat: true` custom claim
+ * set as an httpOnly cookie after the founder proves a verified Google
+ * identity whose email is on the `ADMIN_EMAIL` allowlist
  * (`/api/admin/session`, which does the one Admin-SDK check —
- * `verifyIdToken` + claim — that can't run on Edge).
+ * `verifyIdToken` + email match — that can't run on Edge).
  *
  * SHORTER-LIVED than a staff shift: 4 hours. A founder console can revoke
  * a whole platform's access; a stale cookie on a walked-away-from laptop
