@@ -3,17 +3,27 @@
 /**
  * src/components/cashier/cashier-dashboard-view.tsx
  *
- * The Cashier / front-of-house console, restyled to the Stitch
- * "Utilitarian POS & Floor Console — Floor Grid" design: a white top bar
- * with a Floor Grid / Order Queue / Shift Close segmented nav, a zone
- * filter + search toolbar, and the table-card grid. Live data still
- * comes from `useLiveCashierData` (`tables` / `sessions` / `orders` /
- * `staffAlerts` snapshots); the void, alert-resolve and settle-&-close
- * flows are unchanged.
+ * The Cashier / front-of-house console, built to the Stitch "Utilitarian
+ * POS & Floor Console — Floor Grid" screen: a full-width top bar (brand,
+ * live status pills, Floor Grid / Alerts & Pagers / Order Queue / Shift
+ * Close nav, Lock Console), a 64px icon rail, a stats-and-filter toolbar,
+ * and the table-card grid. Live data still comes from `useLiveCashierData`
+ * (`tables` / `sessions` / `orders` / `staffAlerts` snapshots); the void,
+ * alert-resolve and settle-&-close flows are unchanged.
  */
 
 import { useMemo, useState } from 'react';
-import { LayoutGrid, ListOrdered, DoorClosed, Search } from 'lucide-react';
+import {
+  LayoutGrid,
+  BellRing,
+  Monitor,
+  IdCard,
+  SlidersHorizontal,
+  Siren,
+  Search,
+  RefreshCw,
+  Volume2,
+} from 'lucide-react';
 import { ClockProvider } from '@/components/providers/clock-provider';
 import { TableOverviewGrid } from './table-overview-grid';
 import { TableDetailPanel } from './table-detail-panel';
@@ -37,14 +47,14 @@ interface CashierDashboardViewProps {
 export function CashierDashboardView({ tenantSlug, staff, tenantId, branchId }: CashierDashboardViewProps) {
   if (!branchId) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-[#F3F4F6] px-6 text-center">
+      <div className="flex min-h-dvh items-center justify-center bg-[#F8F9FF] px-6 text-center">
         <p className="text-sm text-[#6B7280]">Your account has no branch assigned. Contact a manager.</p>
       </div>
     );
   }
   return (
     <ClockProvider>
-      <CashierDashboardBody tenantSlug={tenantSlug} staff={staff} tenantId={tenantId} branchId={branchId} />
+      <Body tenantSlug={tenantSlug} staff={staff} tenantId={tenantId} branchId={branchId} />
     </ClockProvider>
   );
 }
@@ -54,15 +64,14 @@ interface VoidStatus {
   message: string;
   tone: 'ok' | 'warn' | 'error';
 }
+type Tab = 'floor' | 'alerts' | 'queue' | 'shift';
 
-type Tab = 'floor' | 'queue' | 'shift';
-
-function Shell({ tenantSlug, message }: { tenantSlug: string; message: string }) {
+function LoadState({ message }: { message: string }) {
   return (
-    <div className="flex min-h-dvh flex-col bg-[#F3F4F6]">
+    <div className="flex min-h-dvh flex-col bg-[#F8F9FF]">
       <header className="border-b border-[#E5E7EB] bg-white px-6 py-3">
         <p className="text-sm font-bold text-[#003A3E]">TableBells</p>
-        <p className="text-xs text-[#6B7280]">Staff Operations · {tenantSlug}</p>
+        <p className="text-xs text-[#6B7280]">Staff Operations</p>
       </header>
       <div className="flex flex-1 items-center justify-center px-6 text-center">
         <p className="text-sm text-[#6B7280]">{message}</p>
@@ -71,7 +80,7 @@ function Shell({ tenantSlug, message }: { tenantSlug: string; message: string })
   );
 }
 
-function CashierDashboardBody({
+function Body({
   tenantSlug,
   staff,
   tenantId,
@@ -96,14 +105,17 @@ function CashierDashboardBody({
   const visibleAlerts = live.alerts.filter((a) => !dismissedAlertIds.has(a.id));
 
   const zones = useMemo(() => {
-    const set = new Set<string>();
-    for (const t of live.tables) set.add(t.zoneId || 'unzoned');
-    return [...set].sort();
+    const s = new Set<string>();
+    for (const t of live.tables) s.add(t.zoneId || 'unzoned');
+    return [...s].sort();
   }, [live.tables]);
 
-  const occupiedCount = live.tables.filter((t) => t.partyCount > 0 || t.status === 'occupied').length;
+  const occupied = live.tables.filter((t) => t.partyCount > 0 || t.status === 'occupied').length;
+  const available = live.tables.filter((t) => t.status === 'available').length;
+  const attention = live.tables.filter((t) => t.activeCall || t.status === 'attention').length;
   const billingTables = live.tables.filter((t) => t.parties.some((p) => p.status === 'billing'));
   const floorTotalFils = live.tables.reduce((s, t) => s + (t.openTabFils || 0), 0);
+  const pct = live.tables.length ? Math.round((occupied / live.tables.length) * 100) : 0;
   const currency = live.orders.find((o) => typeof o.currency === 'string')?.currency;
   const money = (fils: number) => formatMoney(fils, currency);
 
@@ -112,7 +124,7 @@ function CashierDashboardBody({
     setReviewingAlert(null);
   }
 
-  async function handleResolveAlert(alert: StaffAlert) {
+  async function resolveAlert(alert: StaffAlert) {
     setDismissedAlertIds((prev) => new Set(prev).add(alert.id));
     const result = await resolveStaffAlert({ branchId, alertId: alert.id });
     if (result.outcome === 'rejected') {
@@ -123,6 +135,14 @@ function CashierDashboardBody({
       });
       setVoidStatus({ orderCode: alert.tableCode, message: `Couldn't dismiss alert: ${result.reason}.`, tone: 'error' });
     }
+  }
+
+  function handleHandleCall(tableId: string) {
+    const table = live.tables.find((t) => t.id === tableId);
+    if (!table) return;
+    const match = visibleAlerts.find((a) => a.tableCode === table.code);
+    if (match) void resolveAlert(match);
+    else setSelectedTableId(tableId);
   }
 
   async function handleVoidLine(orderId: string, lineId: string, reason: VoidReasonCode, note: string) {
@@ -142,132 +162,215 @@ function CashierDashboardBody({
     }
   }
 
-  if (live.status === 'loading') return <Shell tenantSlug={tenantSlug} message="Loading the floor…" />;
-  if (live.status === 'error') {
-    return <Shell tenantSlug={tenantSlug} message="Couldn't load live floor data. Check your connection." />;
-  }
+  if (live.status === 'loading') return <LoadState message="Loading the floor…" />;
+  if (live.status === 'error') return <LoadState message="Couldn't load live floor data. Check your connection." />;
 
-  const tabs: { id: Tab; label: string; icon: typeof LayoutGrid }[] = [
-    { id: 'floor', label: 'Floor Grid', icon: LayoutGrid },
-    { id: 'queue', label: 'Order Queue', icon: ListOrdered },
-    { id: 'shift', label: 'Shift Close', icon: DoorClosed },
+  const NAV: { id: Tab; label: string }[] = [
+    { id: 'floor', label: 'Floor Grid' },
+    { id: 'alerts', label: 'Alerts & Pagers' },
+    { id: 'queue', label: 'Order Queue' },
+    { id: 'shift', label: 'Shift Close' },
+  ];
+  const RAIL: { id: Tab | 'roster' | 'settings' | 'sos'; icon: typeof LayoutGrid; label: string; dot?: boolean }[] = [
+    { id: 'floor', icon: LayoutGrid, label: 'Floor map' },
+    { id: 'alerts', icon: BellRing, label: 'Service bell calls', dot: visibleAlerts.length > 0 },
+    { id: 'queue', icon: Monitor, label: 'Live docket' },
+    { id: 'roster', icon: IdCard, label: 'Staff roster' },
   ];
 
   return (
-    <div className="flex min-h-dvh flex-col bg-[#F3F4F6]">
+    <div className="min-h-dvh bg-[#F8F9FF]">
       {/* Top bar */}
-      <header className="sticky top-0 z-30 flex flex-wrap items-center justify-between gap-3 border-b border-[#E5E7EB] bg-white px-6 py-3">
-        <div className="flex items-center gap-5">
-          <div>
+      <header className="fixed inset-x-0 top-0 z-40 flex h-14 items-center justify-between gap-3 border-b border-[#E5E7EB] bg-white px-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#003A3E] text-xs font-bold text-white">
+            TB
+          </span>
+          <div className="min-w-0 leading-tight">
             <p className="text-sm font-bold text-[#003A3E]">TableBells</p>
-            <p className="text-xs text-[#6B7280]">Staff Operations · {tenantSlug}</p>
+            <p className="truncate text-xs text-[#6B7280]">Staff Operations · {tenantSlug}</p>
           </div>
-          <nav className="flex items-center gap-1 rounded-xl bg-[#F3F4F6] p-1">
-            {tabs.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setTab(t.id)}
-                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
-                  tab === t.id ? 'bg-[#0F5257] text-white shadow-sm' : 'text-[#4B5563] hover:text-[#1F2937]'
-                }`}
-              >
-                <t.icon className="h-4 w-4" />
-                {t.label}
-              </button>
-            ))}
-          </nav>
+          <span className="mx-1 hidden h-6 w-px bg-[#E5E7EB] lg:block" />
+          <span className="hidden items-center gap-1.5 rounded-xl bg-[#EFF4FF] px-2.5 py-1 text-xs text-[#1F2937] lg:inline-flex">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-[#10B981]" /> Service active
+          </span>
+          <span className="hidden items-center gap-1.5 rounded-xl bg-[#E6EEFF] px-2.5 py-1 text-[10px] font-bold uppercase xl:inline-flex">
+            <span className="text-[#EF4444]">{visibleAlerts.length} alerts</span>
+            <span className="text-[#BFC8C9]">•</span>
+            <span className="text-[#176B4B]">{occupied} tables open</span>
+          </span>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="hidden text-end sm:block">
-            <p className="text-sm font-semibold text-[#1F2937]">{staff.displayName}</p>
-            <p className="text-xs text-[#6B7280]">{roleLabel(staff.role)}</p>
-          </div>
+
+        <nav className="hidden items-center gap-1 rounded-xl bg-[#EFF4FF] p-1 md:flex">
+          {NAV.map((n) => (
+            <button
+              key={n.id}
+              type="button"
+              onClick={() => setTab(n.id)}
+              className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
+                tab === n.id ? 'bg-[#FF6B4A] text-white shadow-sm' : 'text-[#4B5563] hover:text-[#1F2937]'
+              }`}
+            >
+              {n.label}
+            </button>
+          ))}
+        </nav>
+
+        <div className="flex items-center gap-2">
+          <span className="hidden items-center gap-1 rounded-xl bg-[#EFF4FF] px-2.5 py-1.5 text-[10px] font-bold uppercase text-[#404849] lg:inline-flex">
+            <Volume2 className="h-3.5 w-3.5 text-[#176B4B]" /> Sound on
+          </span>
           <LockSwitchButton tenantSlug={tenantSlug} />
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#FF6B4A] text-xs font-bold text-white">
+            {staff.displayName.slice(0, 1).toUpperCase()}
+          </span>
         </div>
       </header>
 
-      {/* Toolbar (floor tab only) */}
-      {tab === 'floor' ? (
-        <div className="flex flex-wrap items-center gap-2 border-b border-[#E5E7EB] bg-white px-6 py-2.5">
-          <div className="flex flex-wrap items-center gap-1 rounded-lg bg-[#F3F4F6] p-1">
-            <ZoneTab active={zone === 'all'} onClick={() => setZone('all')}>
-              All zones ({live.tables.length})
-            </ZoneTab>
-            {zones.map((z) => (
-              <ZoneTab key={z} active={zone === z} onClick={() => setZone(z)}>
-                {z === 'unzoned' ? 'Unzoned' : z} ({live.tables.filter((t) => (t.zoneId || 'unzoned') === z).length})
-              </ZoneTab>
-            ))}
-          </div>
-          <div className="ms-auto flex h-9 items-center gap-2 rounded-lg border border-[#E5E7EB] bg-[#F3F4F6] px-3">
-            <Search className="h-4 w-4 text-[#6B7280]" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Find table…"
-              className="w-40 bg-transparent text-sm text-[#1F2937] outline-none placeholder:text-[#9CA3AF]"
-            />
-          </div>
-          {visibleAlerts.length > 0 ? (
-            <span className="rounded-full bg-[#FEE2E2] px-2.5 py-1 text-xs font-bold text-[#E5484D] ring-1 ring-[#FCA5A5]">
-              {visibleAlerts.length} alert{visibleAlerts.length === 1 ? '' : 's'}
-            </span>
+      {/* Icon rail */}
+      <aside className="fixed left-0 top-14 z-30 flex h-[calc(100dvh-3.5rem)] w-16 flex-col items-center justify-between border-r border-[#E5E7EB] bg-white py-4">
+        <div className="flex flex-col items-center gap-2">
+          {RAIL.map((r) => {
+            const isActive = r.id === tab;
+            return (
+              <button
+                key={r.id}
+                type="button"
+                title={r.label}
+                aria-label={r.label}
+                onClick={() => {
+                  if (r.id === 'floor' || r.id === 'alerts' || r.id === 'queue') setTab(r.id);
+                }}
+                className={`relative flex h-11 w-11 items-center justify-center rounded-xl transition-colors ${
+                  isActive ? 'bg-[#E6EEFF] text-[#003A3E]' : 'text-[#6B7280] hover:bg-[#EFF4FF] hover:text-[#1F2937]'
+                }`}
+              >
+                <r.icon className="h-5 w-5" />
+                {r.dot ? (
+                  <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-[#EF4444] ring-2 ring-white" />
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex flex-col items-center gap-2">
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl text-[#6B7280]">
+            <SlidersHorizontal className="h-5 w-5" />
+          </span>
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#FFDAD6] text-[#93000A]">
+            <Siren className="h-5 w-5" />
+          </span>
+        </div>
+      </aside>
+
+      {/* Content */}
+      <div className="pl-16 pt-14">
+        {/* Toolbar */}
+        <div className="flex flex-wrap items-center gap-2 bg-[#EFF4FF] px-4 py-3 shadow-sm">
+          <StatPill label="Capacity" value={`${live.tables.length} tables`} />
+          <span className="inline-flex items-center gap-1.5 rounded-xl bg-[#1F2937] px-3 py-1.5 text-sm font-bold text-white">
+            <span className="h-2 w-2 rounded-full bg-[#FF6B4A]" /> {occupied} occupied
+            <span className="font-normal opacity-80">({pct}%)</span>
+          </span>
+          <span className="inline-flex items-center gap-1.5 rounded-xl border border-[#A7F3D0] bg-[#ECFDF5] px-3 py-1.5 text-sm font-bold text-[#047857]">
+            <span className="h-2 w-2 rounded-full bg-[#10B981]" /> {available} available
+          </span>
+          <span className="inline-flex items-center gap-1.5 rounded-xl border border-[#FECACA] bg-[#FEF2F2] px-3 py-1.5 text-sm font-bold text-[#DC2626]">
+            <span className={`h-2 w-2 rounded-full bg-[#EF4444] ${attention ? 'animate-ping' : ''}`} /> {attention} attention
+          </span>
+
+          {tab === 'floor' ? (
+            <>
+              <div className="flex flex-wrap items-center gap-1 rounded-xl bg-[#E6EEFF] p-1">
+                <ZoneTab active={zone === 'all'} onClick={() => setZone('all')}>
+                  All zones ({live.tables.length})
+                </ZoneTab>
+                {zones.map((z) => (
+                  <ZoneTab key={z} active={zone === z} onClick={() => setZone(z)}>
+                    {z === 'unzoned' ? 'Unzoned' : z} (
+                    {live.tables.filter((t) => (t.zoneId || 'unzoned') === z).length})
+                  </ZoneTab>
+                ))}
+              </div>
+              <div className="ms-auto flex items-center gap-2">
+                <div className="flex h-10 items-center gap-2 rounded-xl bg-white px-3 shadow-sm">
+                  <Search className="h-4 w-4 text-[#6B7280]" />
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Find table or server…"
+                    className="w-44 bg-transparent text-sm text-[#1F2937] outline-none placeholder:text-[#9CA3AF]"
+                  />
+                </div>
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#E6EEFF] text-[#003A3E]">
+                  <RefreshCw className="h-4 w-4" />
+                </span>
+              </div>
+            </>
           ) : null}
         </div>
-      ) : null}
 
-      <main className="flex-1 space-y-4 px-6 py-4">
-        {voidStatus ? (
-          <p
-            className={[
-              'rounded-lg border px-3 py-2 text-sm',
-              voidStatus.tone === 'ok'
-                ? 'border-[#0F5257]/30 bg-[#ECFDF5] text-[#065F46]'
-                : voidStatus.tone === 'warn'
-                  ? 'border-[#D97706]/30 bg-[#FFFBEB] text-[#92400E]'
-                  : 'border-[#E5484D]/30 bg-[#FDECEC] text-[#7A1E22]',
-            ].join(' ')}
-          >
-            <span className="font-semibold">#{voidStatus.orderCode}:</span> {voidStatus.message}
-          </p>
-        ) : null}
+        <main className="space-y-4 p-4">
+          {voidStatus ? (
+            <p
+              className={[
+                'rounded-lg border px-3 py-2 text-sm',
+                voidStatus.tone === 'ok'
+                  ? 'border-[#0F5257]/30 bg-[#ECFDF5] text-[#065F46]'
+                  : voidStatus.tone === 'warn'
+                    ? 'border-[#D97706]/30 bg-[#FFFBEB] text-[#92400E]'
+                    : 'border-[#E5484D]/30 bg-[#FDECEC] text-[#7A1E22]',
+              ].join(' ')}
+            >
+              <span className="font-semibold">#{voidStatus.orderCode}:</span> {voidStatus.message}
+            </p>
+          ) : null}
 
-        {tab === 'floor' ? (
-          <>
-            {visibleAlerts.length > 0 ? (
-              <section>
-                <h2 className="mb-2 text-[10px] font-bold uppercase tracking-widest text-[#6B7280]">Alerts</h2>
+          {tab === 'floor' ? (
+            <TableOverviewGrid
+              tables={live.tables}
+              orders={live.orders}
+              onSelectTable={setSelectedTableId}
+              onHandleCall={handleHandleCall}
+              zoneFilter={zone}
+              query={query}
+            />
+          ) : null}
+
+          {tab === 'alerts' ? (
+            <section>
+              <h2 className="mb-2 text-[10px] font-bold uppercase tracking-widest text-[#6B7280]">
+                Service bell calls &amp; pagers
+              </h2>
+              {visibleAlerts.length === 0 ? (
+                <p className="rounded-xl border border-[#E5E7EB] bg-white px-4 py-10 text-center text-sm text-[#6B7280]">
+                  No open alerts. All tables are quiet.
+                </p>
+              ) : (
                 <AlertsInbox
                   alerts={visibleAlerts}
                   staff={staff}
                   onReview={setReviewingAlert}
-                  onResolve={handleResolveAlert}
+                  onResolve={resolveAlert}
                 />
-              </section>
-            ) : null}
-            <TableOverviewGrid
-              tables={live.tables}
-              onSelectTable={setSelectedTableId}
-              zoneFilter={zone}
-              query={query}
+              )}
+            </section>
+          ) : null}
+
+          {tab === 'queue' ? (
+            <OrderQueue orders={live.orders} money={money} onSelectTable={setSelectedTableId} />
+          ) : null}
+
+          {tab === 'shift' ? (
+            <ShiftClose
+              occupiedCount={occupied}
+              floorTotal={money(floorTotalFils)}
+              billingTables={billingTables.map((t) => ({ id: t.id, code: t.code }))}
+              onOpenTable={setSelectedTableId}
             />
-          </>
-        ) : null}
-
-        {tab === 'queue' ? (
-          <OrderQueue orders={live.orders} money={money} onSelectTable={setSelectedTableId} />
-        ) : null}
-
-        {tab === 'shift' ? (
-          <ShiftClose
-            occupiedCount={occupiedCount}
-            floorTotal={money(floorTotalFils)}
-            billingTables={billingTables.map((t) => ({ id: t.id, code: t.code }))}
-            onOpenTable={setSelectedTableId}
-          />
-        ) : null}
-      </main>
+          ) : null}
+        </main>
+      </div>
 
       {selectedTable ? (
         <TableDetailPanel
@@ -293,21 +396,22 @@ function CashierDashboardBody({
   );
 }
 
-function ZoneTab({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
+function StatPill({ label, value }: { label: string; value: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-xl bg-white px-3 py-1.5 text-sm shadow-sm">
+      <span className="text-[10px] font-bold uppercase tracking-wide text-[#6B7280]">{label}</span>
+      <span className="font-bold text-[#003A3E]">{value}</span>
+    </span>
+  );
+}
+
+function ZoneTab({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-md px-2.5 py-1 text-xs font-semibold capitalize transition-colors ${
-        active ? 'bg-white text-[#0F5257] shadow-sm' : 'text-[#4B5563] hover:text-[#1F2937]'
+      className={`rounded-lg px-2.5 py-1 text-xs font-bold capitalize transition-colors ${
+        active ? 'bg-[#FF6B4A] text-white shadow-sm' : 'text-[#4B5563] hover:text-[#1F2937]'
       }`}
     >
       {children}
@@ -345,7 +449,7 @@ function OrderQueue({
     <div className="overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-sm">
       <table className="w-full text-left text-sm">
         <thead>
-          <tr className="bg-[#F3F4F6] text-[10px] uppercase tracking-widest text-[#6B7280]">
+          <tr className="bg-[#EFF4FF] text-[10px] uppercase tracking-widest text-[#6B7280]">
             <th className="px-4 py-3 font-bold">Ticket</th>
             <th className="px-3 py-3 font-bold">Table</th>
             <th className="px-3 py-3 font-bold">Items</th>
@@ -358,19 +462,17 @@ function OrderQueue({
             <tr
               key={o.id}
               onClick={() => onSelectTable(o.tableId)}
-              className="cursor-pointer border-t border-[#F3F4F6] hover:bg-[#F3F4F6]/60"
+              className="cursor-pointer border-t border-[#F3F4F6] hover:bg-[#EFF4FF]/60"
             >
               <td className="px-4 py-3 font-mono font-semibold text-[#1F2937]">#{o.code}</td>
               <td className="px-3 py-3 text-[#4B5563]">{o.tableCode}</td>
-              <td className="px-3 py-3 text-[#4B5563]">
-                {o.items.reduce((n, it) => n + (it.qty || 0), 0)}
-              </td>
+              <td className="px-3 py-3 text-[#4B5563]">{o.items.reduce((n, it) => n + (it.qty || 0), 0)}</td>
               <td className="px-3 py-3">
-                <span className="rounded bg-[#DEE9FC] px-2 py-0.5 text-[10px] font-bold uppercase text-[#0F5257]">
+                <span className="rounded bg-[#E6EEFF] px-2 py-0.5 text-[10px] font-bold uppercase text-[#003A3E]">
                   {o.status}
                 </span>
               </td>
-              <td className="px-4 py-3 text-right font-semibold tabular-nums text-[#1F2937]">{money(o.grossFils)}</td>
+              <td className="px-4 py-3 text-right font-bold tabular-nums text-[#1F2937]">{money(o.grossFils)}</td>
             </tr>
           ))}
         </tbody>
@@ -395,9 +497,12 @@ function ShiftClose({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <ShiftStat label="Occupied tables" value={String(occupiedCount)} />
         <ShiftStat label="On the floor" value={floorTotal} />
-        <ShiftStat label="Bills requested" value={String(billingTables.length)} tone={billingTables.length ? 'warn' : undefined} />
+        <ShiftStat
+          label="Bills requested"
+          value={String(billingTables.length)}
+          tone={billingTables.length ? 'warn' : undefined}
+        />
       </div>
-
       <section className="rounded-xl border border-[#E5E7EB] bg-white p-5 shadow-sm">
         <h2 className="text-sm font-bold text-[#1F2937]">Tables waiting to settle</h2>
         {billingTables.length === 0 ? (
@@ -405,12 +510,12 @@ function ShiftClose({
         ) : (
           <ul className="mt-3 flex flex-col gap-2">
             {billingTables.map((t) => (
-              <li key={t.id} className="flex items-center justify-between rounded-lg bg-[#F3F4F6] px-3 py-2">
+              <li key={t.id} className="flex items-center justify-between rounded-lg bg-[#EFF4FF] px-3 py-2">
                 <span className="font-bold text-[#1F2937]">{t.code}</span>
                 <button
                   type="button"
                   onClick={() => onOpenTable(t.id)}
-                  className="rounded-lg bg-[#0F5257] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#093336]"
+                  className="rounded-lg bg-[#FF6B4A] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#E05333]"
                 >
                   Open to settle
                 </button>
@@ -419,8 +524,7 @@ function ShiftClose({
           </ul>
         )}
         <p className="mt-3 text-xs text-[#9CA3AF]">
-          Settle &amp; Close lives inside each table&apos;s detail panel — it verifies payment handling and frees the
-          table on the floor.
+          Settle &amp; Close lives inside each table&apos;s detail panel — it frees the table on the floor once handled.
         </p>
       </section>
     </div>

@@ -3,14 +3,14 @@
 /**
  * src/components/cashier/table-overview-grid.tsx
  *
- * The Floor Grid: a dense, tablet-first grid of every table for the
- * branch (PRD.md §2.3), with the design's zone filter + free-text search
- * applied. Sorted so tables that need attention (calls, then bills) come
- * first, then occupied, then the rest by `sortIndex`.
+ * The Floor Grid: every table for the branch as a card, with the
+ * design's zone filter + free-text search applied and attention-first
+ * ordering (calls, then bills, then occupied, then free).
  */
 
 import { useMemo } from 'react';
 import { TableCard, type TableWithId } from './table-card';
+import type { OrderWithId } from '@/components/ops/ticket-card';
 
 function rank(t: TableWithId): number {
   if (t.activeCall || t.status === 'attention') return 0;
@@ -22,15 +22,20 @@ function rank(t: TableWithId): number {
 
 export function TableOverviewGrid({
   tables,
+  orders = [],
   onSelectTable,
+  onHandleCall,
   zoneFilter = 'all',
   query = '',
 }: {
   tables: TableWithId[];
+  orders?: OrderWithId[];
   onSelectTable: (tableId: string) => void;
+  onHandleCall?: (tableId: string) => void;
   zoneFilter?: string;
   query?: string;
 }) {
+  const handleCall = onHandleCall ?? onSelectTable;
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
     return tables
@@ -51,12 +56,16 @@ export function TableOverviewGrid({
   }
 
   return (
-    <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
       {shown.map((table) => (
-        <li key={table.id}>
-          <TableCard table={table} onSelect={onSelectTable} />
-        </li>
+        <TableCard
+          key={table.id}
+          table={table}
+          orders={orders.filter((o) => o.tableId === table.id)}
+          onSelect={onSelectTable}
+          onHandleCall={handleCall}
+        />
       ))}
-    </ul>
+    </div>
   );
 }
