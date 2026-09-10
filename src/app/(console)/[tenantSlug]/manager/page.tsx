@@ -85,7 +85,12 @@ export default async function ManagerOverviewPage({
         </span>
       }
     >
-      <OverviewDashboard tenantSlug={tenantSlug} branchName={name} data={overview} />
+      <OverviewDashboard
+        tenantSlug={tenantSlug}
+        branchName={name}
+        managerName={session.displayName}
+        data={overview}
+      />
     </ManagerShell>
   );
 }

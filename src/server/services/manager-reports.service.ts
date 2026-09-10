@@ -56,7 +56,20 @@ export interface ManagerOverview {
     aovFils: number;
     avgPrepSeconds: number | null;
   };
-  week: { label: string; date: string; count: number; isToday: boolean }[];
+  /** Same shape for yesterday, so the KPI cards can show a delta. */
+  yesterday: {
+    orderCount: number;
+    grossFils: number;
+    aovFils: number;
+    covers: number;
+  };
+  week: {
+    label: string;
+    date: string;
+    count: number;
+    revenueFils: number;
+    isToday: boolean;
+  }[];
   topItems: { name: string; qty: number; revenueFils: number }[];
   openTables: number;
   openAlerts: number;
@@ -130,7 +143,13 @@ export async function getManagerOverview(tenantId: string, branchId: string): Pr
   const orderCount = todayOrders.length;
   const topItems = [...itemMap.values()].sort((a, b) => b.revenueFils - a.revenueFils).slice(0, 5);
 
-  // ---- last 7 days ----
+  // ---- yesterday (for KPI deltas) ----
+  const yStart = startToday - DAY_MS;
+  const yOrders = orders.filter((o) => o.status !== 'voided' && toMs(o.placedAt) >= yStart && toMs(o.placedAt) < startToday);
+  const yGross = yOrders.reduce((s, o) => s + (o.grossFils ?? 0), 0);
+  const yCovers = yOrders.reduce((s, o) => s + (o.covers ?? 0), 0);
+
+  // ---- last 7 days (count + revenue per day) ----
   const week = Array.from({ length: 7 }, (_, i) => {
     const dayStart = weekStart + i * DAY_MS;
     const d = new Date(dayStart + UAE_OFFSET_MS);
@@ -138,6 +157,7 @@ export async function getManagerOverview(tenantId: string, branchId: string): Pr
       label: WEEKDAYS[d.getUTCDay()],
       date: d.toISOString().slice(0, 10),
       count: 0,
+      revenueFils: 0,
       isToday: dayStart === startToday,
     };
   });
@@ -146,7 +166,10 @@ export async function getManagerOverview(tenantId: string, branchId: string): Pr
     const t = toMs(o.placedAt);
     if (t < weekStart || t >= startToday + DAY_MS) continue;
     const idx = Math.floor((t - weekStart) / DAY_MS);
-    if (idx >= 0 && idx < 7) week[idx].count += 1;
+    if (idx >= 0 && idx < 7) {
+      week[idx].count += 1;
+      week[idx].revenueFils += o.grossFils ?? 0;
+    }
   }
 
   return {
@@ -161,6 +184,12 @@ export async function getManagerOverview(tenantId: string, branchId: string): Pr
       covers,
       aovFils: orderCount > 0 ? Math.round(grossFils / orderCount) : 0,
       avgPrepSeconds: prepN > 0 ? Math.round(prepTotal / prepN / 1000) : null,
+    },
+    yesterday: {
+      orderCount: yOrders.length,
+      grossFils: yGross,
+      aovFils: yOrders.length > 0 ? Math.round(yGross / yOrders.length) : 0,
+      covers: yCovers,
     },
     week,
     topItems,
