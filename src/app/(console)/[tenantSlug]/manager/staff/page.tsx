@@ -35,10 +35,10 @@ export default async function ManagerStaffPage({
           </p>
         </div>
         <Link
-          href={`/${tenantSlug}/cashier`}
+          href={`/${tenantSlug}/manager`}
           className="flex h-10 items-center rounded-lg border border-[#E5E7EB] px-3 text-sm font-semibold text-[#1F2937]"
         >
-          Back to console
+          Back to Manager Console
         </Link>
       </header>
       <div className="flex-1 px-4 py-4">{body}</div>
