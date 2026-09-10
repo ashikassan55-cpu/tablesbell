@@ -1,0 +1,26 @@
+rules_version = '2';
+
+// Firebase Storage rules for TableBells image uploads (Store Settings
+// hero photo, Menu Maker item photos). Deploy with:
+//   firebase deploy --only storage
+// (after enabling Storage once in the Firebase console).
+//
+// Images live under tenants/{tenantId}/branches/{branchId}/... and are
+// shown to unauthenticated guests on the QR ordering surface, so read is
+// public. Writes require a signed-in Firebase user (the staff console
+// signs in via a custom token) and must be a <3MB image.
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /tenants/{tenantId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.resource.size < 3 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

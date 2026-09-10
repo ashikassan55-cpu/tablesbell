@@ -16,12 +16,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useBranchSettings } from '@/hooks/use-branch-settings';
 import { updateBranchSettings } from '@/server/actions/branch-settings.actions';
+import { ImageUploadField } from './image-upload-field';
 import { CURRENCIES, formatMoney } from '@/lib/format/money';
 import {
   MAX_RECEIPT_FOOTER,
   MAX_WIFI_SSID,
   MAX_WIFI_PASSWORD,
-  MAX_IMAGE_URL,
   MAX_ADDRESS,
   SUPPORTED_CURRENCIES,
   vatPercentToPpm,
@@ -265,18 +265,15 @@ export function StoreSettingsView({
           Leave the name blank to hide the Wi-Fi tile. The landing shows a “tap to copy” button; the password is never shown in plain text.
         </span>
 
-        <label className="mt-3 flex flex-col text-xs text-[#6B7280]">
-          Hero image URL
-          <input
+        <div className="mt-3">
+          <ImageUploadField
+            label="Hero photo"
             value={form.heroImageUrl}
-            onChange={(e) => set('heroImageUrl', e.target.value.slice(0, MAX_IMAGE_URL))}
-            placeholder="https://…/cafe-photo.jpg"
-            className="mt-0.5 h-10 rounded-md border border-[#E5E7EB] px-2 text-sm text-[#1F2937]"
+            onChange={(url) => set('heroImageUrl', url)}
+            pathPrefix={`tenants/${tenantId}/branches/${branchId}/hero`}
+            hint="Wide photo at the top of the QR landing screen. Blank = a warm coral gradient."
           />
-          <span className="mt-0.5 text-[10px] text-[#9CA3AF]">
-            Wide photo shown at the top of the landing screen. https:// only. Blank = a warm coral gradient.
-          </span>
-        </label>
+        </div>
       </section>
 
       {feedback ? (

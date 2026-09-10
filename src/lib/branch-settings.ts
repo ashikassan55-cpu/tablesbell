@@ -36,12 +36,26 @@ export const MAX_IMAGE_URL = 600;
 export const MAX_ADDRESS = 160;
 export const KITCHEN_STATUSES: readonly KitchenStatus[] = ['live', 'busy', 'closed'];
 
-/** http(s) image URLs only — never `javascript:` / `data:` — length-capped.
- *  Blank passes through as "" (the feature is simply off). */
+/**
+ * An image reference the guest surface can render: either an `http(s)`
+ * URL (Firebase Storage download URL, or a hand-pasted link) or an inline
+ * `data:image/...;base64,` URI (the upload field's no-bucket fallback).
+ * Anything else — `javascript:`, other `data:` types — collapses to "".
+ *
+ * Data URIs are capped at ~700 KB (a compressed ~800px JPEG is well
+ * under that); `MAX_IMAGE_URL` still caps plain links. Firebase Storage
+ * (a real download URL) is the path for anything heavier or more
+ * numerous — see `image-upload-field.tsx`.
+ */
+const MAX_DATA_URI = 700_000;
 export function cleanImageUrl(value: unknown): string {
   if (typeof value !== 'string') return '';
-  const trimmed = value.trim().slice(0, MAX_IMAGE_URL);
-  return /^https?:\/\//i.test(trimmed) ? trimmed : '';
+  const trimmed = value.trim();
+  if (/^https?:\/\//i.test(trimmed)) return trimmed.slice(0, MAX_IMAGE_URL);
+  if (/^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(trimmed)) {
+    return trimmed.length <= MAX_DATA_URI ? trimmed : '';
+  }
+  return '';
 }
 
 export function vatPercentToPpm(percent: number): number {

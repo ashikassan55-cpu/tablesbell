@@ -21,7 +21,6 @@ import { useGuestLocale } from '@/components/providers/guest-locale-provider';
 import { useLiveMenu } from '@/hooks/use-live-menu';
 import { useCart } from '@/components/providers/cart-provider';
 import { useServiceCall } from './use-service-call';
-import { CartBar } from './cart-bar';
 import { formatMoney } from '@/lib/format/money';
 import type { ServiceCallType } from '@/types/firestore';
 
@@ -37,7 +36,7 @@ export function GuestLandingView({ slug }: { slug: string }) {
   const session = useGuestSession();
   const { t, locale, toggle, dir } = useGuestLocale();
   const menu = useLiveMenu(session.tenantId, session.branchId, session.menuVersion, session.authReady);
-  const { addItem, itemCount } = useCart();
+  const { addItem, itemCount, totalFils } = useCart();
   const svc = useServiceCall();
   const [wifiCopied, setWifiCopied] = useState(false);
 
@@ -254,7 +253,25 @@ export function GuestLandingView({ slug }: { slug: string }) {
           </div>
         ) : null}
 
-        {itemCount > 0 ? <div className="mb-2"><CartBar tableCode={session.tableCode} /></div> : null}
+        {itemCount > 0 ? (
+          <Link
+            href={`/t/${slug}/cart`}
+            className="mb-2 flex items-center justify-between rounded-full bg-[#FF6B4A] px-4 py-3 text-white shadow-xl active:scale-[0.98]"
+          >
+            <span className="flex items-center gap-2 text-sm font-semibold">
+              <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-white/25 px-1.5 text-xs">
+                {itemCount}
+              </span>
+              {t('table')} #{session.tableCode}
+            </span>
+            <span className="flex items-center gap-2 text-sm font-bold">
+              {formatMoney(totalFils, session.currency)}
+              <span>
+                {t('view_cart')} <span aria-hidden>{dir === 'rtl' ? '←' : '→'}</span>
+              </span>
+            </span>
+          </Link>
+        ) : null}
 
         <div className="mb-3 flex items-stretch overflow-hidden rounded-full bg-[#FF6B4A] text-white shadow-xl">
           <button

@@ -26,6 +26,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, Plus, Pencil, Trash2, SlidersHorizontal, X } from 'lucide-react';
 import { useMenuDraft } from '@/hooks/use-menu-draft';
 import { seedMenuDraft, saveMenuDraft, publishMenu } from '@/server/actions/menu.actions';
+import { ImageUploadField } from './image-upload-field';
 import type { LocalizedText, MenuItem, MenuItemStatus, MenuTreeCategory } from '@/types/firestore';
 
 function filsToAed(fils: number): string {
@@ -517,6 +518,8 @@ export function MenuMakerView({ tenantId, branchId, liveVersion, velocity = {} }
           initial={editing.item}
           categories={catOptions}
           defaultCategoryId={editing.categoryId ?? catOptions[0]?.id ?? null}
+          tenantId={tenantId}
+          branchId={branchId}
           onCancel={() => setEditing(null)}
           onSave={(categoryId, item) => upsertItem(categoryId, item)}
         />
@@ -540,12 +543,16 @@ function ItemEditor({
   initial,
   categories,
   defaultCategoryId,
+  tenantId,
+  branchId,
   onCancel,
   onSave,
 }: {
   initial: MenuItem | null;
   categories: { id: string; label: string }[];
   defaultCategoryId: string | null;
+  tenantId: string;
+  branchId: string;
   onCancel: () => void;
   onSave: (categoryId: string, item: MenuItem) => void;
 }) {
@@ -631,15 +638,13 @@ function ItemEditor({
               className="mt-0.5 rounded-lg border border-[#E5E7EB] bg-white p-2 text-sm text-[#1F2937]"
             />
           </label>
-          <label className={L}>
-            Photo URL
-            <input
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value.slice(0, 600))}
-              placeholder="https://…/dish.jpg"
-              className={F}
-            />
-          </label>
+          <ImageUploadField
+            label="Photo"
+            value={imageUrl}
+            onChange={setImageUrl}
+            pathPrefix={`tenants/${tenantId}/branches/${branchId}/menu/${initial?.id ?? 'new'}`}
+            hint="Square photo shown on the guest menu. Optional."
+          />
           <div className="flex gap-2">
             <label className={`${L} flex-1`}>
               Price (AED)
