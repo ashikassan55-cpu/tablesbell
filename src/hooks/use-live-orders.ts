@@ -44,7 +44,6 @@ import {
   type DocumentData,
   type FirestoreError,
   type QueryDocumentSnapshot,
-  type Timestamp,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import type { OrderWithId } from '@/components/ops/ticket-card';
@@ -57,8 +56,27 @@ export type LiveOrdersState =
   | { status: 'ready'; orders: OrderWithId[]; error: null }
   | { status: 'error'; orders: OrderWithId[]; error: string };
 
-function toMillisOrNull(value: Timestamp | null | undefined): number | null {
-  return value ? value.toMillis() : null;
+/**
+ * Tolerant of BOTH representations a timestamp field can arrive in: a
+ * native Firestore `Timestamp` (what `priceOrderRequest` / `advanceTicket`
+ * write via `serverTimestamp()`) and a plain epoch-ms `number` (what the
+ * demo seed script and any future number-writing path produce). A raw
+ * `.toMillis()` call assumed the former and threw `toMillis is not a
+ * function` on the latter -- this matches `live-snapshots.ts`'
+ * `toMillisMaybe`, which the sibling table/session/alert converters
+ * already use.
+ */
+function toMillisOrNull(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'number') return value;
+  if (
+    typeof value === 'object' &&
+    'toMillis' in value &&
+    typeof (value as { toMillis: unknown }).toMillis === 'function'
+  ) {
+    return (value as { toMillis: () => number }).toMillis();
+  }
+  return null;
 }
 
 /**
@@ -77,7 +95,7 @@ export function convertOrderSnapshot(doc: QueryDocumentSnapshot<DocumentData>): 
   return {
     ...(data as unknown as OrderWithId),
     id: doc.id,
-    placedAt: (data.placedAt as Timestamp).toMillis(),
+    placedAt: toMillisOrNull(data.placedAt) ?? 0,
     prepStartedAt: toMillisOrNull(data.prepStartedAt),
     readyAt: toMillisOrNull(data.readyAt),
     servedAt: toMillisOrNull(data.servedAt),
