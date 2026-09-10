@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { requireStaffSession } from '@/server/services/resolve-staff-session';
 import { resolveMenuVersion } from '@/server/services/menu-version';
+import { getMenuItemVelocityToday } from '@/server/services/manager-reports.service';
 import { canManageMenu } from '@/lib/console/staff-permissions';
 import { ManagerShell } from '@/components/manager/manager-shell';
 import { MenuMakerView } from '@/components/manager/menu-maker-view';
@@ -54,9 +55,17 @@ export default async function ManagerMenuPage({
     );
   }
 
-  const liveVersion = await resolveMenuVersion(session.tid, branchId);
+  const [liveVersion, velocity] = await Promise.all([
+    resolveMenuVersion(session.tid, branchId),
+    getMenuItemVelocityToday(session.tid, branchId).catch(() => ({})),
+  ]);
 
   return shell(
-    <MenuMakerView tenantId={session.tid} branchId={branchId} liveVersion={liveVersion} />,
+    <MenuMakerView
+      tenantId={session.tid}
+      branchId={branchId}
+      liveVersion={liveVersion}
+      velocity={velocity}
+    />,
   );
 }

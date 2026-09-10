@@ -198,3 +198,34 @@ export async function getManagerOverview(tenantId: string, branchId: string): Pr
     hasAnyOrders: orders.length > 0,
   };
 }
+
+/**
+ * Per-menu-item units sold + gross for TODAY (Dubai day), keyed by
+ * `menuItemId`. Used by the Menu Management catalog table's "Today's
+ * velocity" column. Same tolerant scan as `getManagerOverview`.
+ */
+export async function getMenuItemVelocityToday(
+  tenantId: string,
+  branchId: string,
+): Promise<Record<string, { qty: number; revenueFils: number }>> {
+  const now = Date.now();
+  const startToday = uaeStartOfToday(now);
+  const snap = await adminDb
+    .collection(`tenants/${tenantId}/branches/${branchId}/orders`)
+    .limit(ORDER_SCAN_LIMIT)
+    .get();
+
+  const out: Record<string, { qty: number; revenueFils: number }> = {};
+  for (const doc of snap.docs) {
+    const o = doc.data() as OrderDoc;
+    if (o.status === 'voided' || toMs(o.placedAt) < startToday) continue;
+    for (const line of o.items ?? []) {
+      if (line.status === 'voided' || !line.menuItemId) continue;
+      const cur = out[line.menuItemId] ?? { qty: 0, revenueFils: 0 };
+      cur.qty += line.qty ?? 0;
+      cur.revenueFils += line.lineTotalFils ?? 0;
+      out[line.menuItemId] = cur;
+    }
+  }
+  return out;
+}
