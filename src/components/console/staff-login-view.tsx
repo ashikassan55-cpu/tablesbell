@@ -87,7 +87,7 @@ export function StaffLoginView({
       response = await fetch('/api/auth/pin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ staffCode: staffCode.trim(), pin: candidatePin }),
+        body: JSON.stringify({ staffCode: staffCode.trim(), pin: candidatePin, tenantSlug }),
       });
     } catch {
       setSubmitState({ status: 'error', message: 'Network error -- check your connection and try again.' });

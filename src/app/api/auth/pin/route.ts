@@ -18,17 +18,15 @@
  * request. Hashing happens once, here, at login; verifying the resulting
  * cookie happens on Edge, cheaply, on every request after.
  *
- * TENANT RESOLUTION, a real, separately-flagged gap: ARCHITECTURE.md
- * never actually specifies how a staff console resolves to a real
- * `tenantId` -- unlike the guest side's `tableSlugs/{slug}`, no
- * equivalent mapping exists anywhere in the schema (`tenants/{t}` has no
- * `slug` field). This route uses the same fixed tenant every mock
- * dataset in this project already uses (`tb_0492`) rather than inventing
- * a resolution scheme unprompted -- a real multi-tenant staff login
- * needs the requesting console's tenant identified some other way
- * (a subdomain, a real slug field added to `tenants/{t}`, or the login
- * form asking for the tenant's own `code` directly) -- a genuine,
- * separate product decision, named here rather than silently decided.
+ * TENANT RESOLUTION (DECISIONS.md ADR-12): the `/{tenantSlug}/lock`
+ * screen POSTs its URL slug alongside the code + PIN;
+ * `resolveTenantIdBySlug` turns it into a real `tenantId` via a
+ * `tenants where slug == …` equality query (single-field auto-index).
+ * `tenants/{t}.slug` is written by the founder onboarding flow
+ * (`platform.actions.ts` `createTenant`). A missing / unknown slug, and
+ * a slug pointing at a SUSPENDED or CHURNED tenant, both collapse into
+ * the same generic `invalid_pin` — no oracle for "which restaurant
+ * exists" or "which stopped paying".
  *
  * UNIFORM FAILURE: `not_found` / `invalid_pin` / `suspended` all collapse
  * into ONE generic response below -- see `staff-login.service.ts`'s own
@@ -49,17 +47,20 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { attemptStaffLogin } from '@/server/services/staff-login.service';
+import { resolveTenantIdBySlug, getTenant, isTenantLoginBlocked } from '@/server/services/tenant.service';
 import {
   signStaffSessionToken,
   STAFF_SESSION_COOKIE_NAME,
   STAFF_SESSION_COOKIE_OPTIONS,
 } from '@/server/auth/staff-session-cookie';
 
-// See the "TENANT RESOLUTION" note above.
-const PLACEHOLDER_TENANT_ID = 'tb_0492';
-
 const STAFF_CODE_PATTERN = /^[A-Za-z0-9]{1,10}$/;
 const PIN_PATTERN = /^\d{4,8}$/;
+const TENANT_SLUG_PATTERN = /^[a-z0-9-]{2,40}$/;
+
+/** Legacy fallback: the seed/demo dataset predates per-tenant slugs.
+ *  Only used when the request omits `tenantSlug` entirely. */
+const FALLBACK_TENANT_ID = 'tb_0492';
 
 export async function POST(request: NextRequest) {
   let body: unknown;
@@ -72,7 +73,11 @@ export async function POST(request: NextRequest) {
   if (typeof body !== 'object' || body === null) {
     return NextResponse.json({ outcome: 'invalid_request' }, { status: 400 });
   }
-  const { staffCode, pin } = body as { staffCode?: unknown; pin?: unknown };
+  const { staffCode, pin, tenantSlug } = body as {
+    staffCode?: unknown;
+    pin?: unknown;
+    tenantSlug?: unknown;
+  };
 
   // Zero-trust on the request body -- this is a public HTTP endpoint,
   // not something only a well-behaved UI can reach.
@@ -83,7 +88,30 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ outcome: 'invalid_request' }, { status: 400 });
   }
 
-  const result = await attemptStaffLogin({ tenantId: PLACEHOLDER_TENANT_ID, staffCode, pin });
+  // Resolve which restaurant this terminal belongs to. Absent slug ->
+  // legacy demo tenant; present but unknown/invalid -> uniform failure.
+  let tenantId: string;
+  if (typeof tenantSlug === 'string' && tenantSlug.length > 0) {
+    if (!TENANT_SLUG_PATTERN.test(tenantSlug)) {
+      return NextResponse.json({ outcome: 'invalid_pin' }, { status: 401 });
+    }
+    const resolved = await resolveTenantIdBySlug(tenantSlug);
+    if (!resolved) {
+      return NextResponse.json({ outcome: 'invalid_pin' }, { status: 401 });
+    }
+    tenantId = resolved;
+  } else {
+    tenantId = FALLBACK_TENANT_ID;
+  }
+
+  // A suspended / churned restaurant accepts no logins -- same generic
+  // response as a wrong PIN.
+  const tenant = await getTenant(tenantId);
+  if (tenant && isTenantLoginBlocked(tenant.status)) {
+    return NextResponse.json({ outcome: 'invalid_pin' }, { status: 401 });
+  }
+
+  const result = await attemptStaffLogin({ tenantId, staffCode, pin });
 
   if (result.outcome === 'locked_out') {
     return NextResponse.json({ outcome: 'locked_out', retryAfterMs: result.retryAfterMs }, { status: 429 });
@@ -96,7 +124,7 @@ export async function POST(request: NextRequest) {
 
   const staffSessionToken = await signStaffSessionToken({
     uid: result.member.uid,
-    tid: PLACEHOLDER_TENANT_ID,
+    tid: tenantId,
     role: result.member.role,
     bids: result.member.branchIds,
     overrideAuth: result.member.overrideAuth,

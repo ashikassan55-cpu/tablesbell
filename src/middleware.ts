@@ -2,6 +2,10 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { verifyDeviceToken, DEVICE_COOKIE_NAME, DEVICE_COOKIE_OPTIONS } from './server/auth/device-cookie';
 import { mintDeviceToken } from './server/auth/mint';
 import { verifyStaffSessionToken, STAFF_SESSION_COOKIE_NAME } from './server/auth/staff-session-cookie';
+import {
+  verifyPlatformSessionToken,
+  PLATFORM_SESSION_COOKIE_NAME,
+} from './server/auth/platform-session-cookie';
 
 /**
  * src/middleware.ts
@@ -44,7 +48,12 @@ import { verifyStaffSessionToken, STAFF_SESSION_COOKIE_NAME } from './server/aut
  */
 
 export const config = {
-  matcher: ['/t/:path*', '/j/:path*', '/:tenantSlug/(kds|cashier|floor|lock|manager)/:path*'],
+  matcher: [
+    '/t/:path*',
+    '/j/:path*',
+    '/admin/:path*',
+    '/:tenantSlug/(kds|cashier|floor|lock|manager)/:path*',
+  ],
 };
 
 export async function middleware(request: NextRequest) {
@@ -54,7 +63,40 @@ export async function middleware(request: NextRequest) {
     return handleGuestRoute(request);
   }
 
+  if (pathname === '/admin' || pathname.startsWith('/admin/')) {
+    return handleAdminRoute(request);
+  }
+
   return handleConsoleRoute(request);
+}
+
+/**
+ * `/admin/*` is the founder super-admin console. Gated on the
+ * `tb_platform` cookie (`/api/admin/session` sets it after a Firebase
+ * email/password sign-in whose token carries `plat: true`). `/admin/login`
+ * is exempt from the redirect for the same anti-loop reason `/lock` is on
+ * the console side. Guest device cookies are cleared here too — a founder
+ * laptop must never carry a `tb_did`.
+ */
+async function handleAdminRoute(request: NextRequest): Promise<NextResponse> {
+  const { pathname, search } = request.nextUrl;
+  const isLogin = pathname === '/admin/login';
+
+  function cleared(response: NextResponse): NextResponse {
+    if (request.cookies.has(DEVICE_COOKIE_NAME)) response.cookies.delete(DEVICE_COOKIE_NAME);
+    return response;
+  }
+
+  if (isLogin) return cleared(NextResponse.next());
+
+  const token = request.cookies.get(PLATFORM_SESSION_COOKIE_NAME)?.value;
+  const session = token ? await verifyPlatformSessionToken(token) : null;
+  if (!session) {
+    const loginUrl = new URL('/admin/login', request.url);
+    loginUrl.searchParams.set('next', pathname + search);
+    return cleared(NextResponse.redirect(loginUrl));
+  }
+  return cleared(NextResponse.next());
 }
 
 async function handleGuestRoute(request: NextRequest): Promise<NextResponse> {

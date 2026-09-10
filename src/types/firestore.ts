@@ -47,6 +47,80 @@
 
 export type LocalizedText = { en: string; ar: string };
 
+// --- Platform / tenant (DECISIONS.md ADR-12) --------------------------
+//
+// `tenants/{tenantId}` — the multi-tenancy root. Written ONLY by the
+// Admin SDK: the founder onboarding flow (`platform.actions.ts`
+// `createTenant`) and the plan / status controls in the `/admin`
+// super-admin console. `firestore.rules` keeps `allow write: if false`
+// for every client; the console is entirely server-rendered + Server
+// Actions, so it never needs a client write path.
+//
+// `slug` is the login / URL identifier a restaurant's staff type at
+// `/{slug}/lock` — resolved to `tenantId` by `resolveTenantIdBySlug`
+// (a `where('slug','==',…)` query, single-field auto-index, no composite).
+// Kept unique by `createTenant` checking before it writes.
+
+export type TenantStatus = 'trial' | 'active' | 'past_due' | 'suspended' | 'churned';
+
+/** The three public plans from the marketing site, by id. */
+export type SubscriptionPlan = 'starter' | 'bistro' | 'busy';
+
+export type BillingStatus = 'trialing' | 'paid' | 'past_due' | 'suspended';
+
+export interface TenantSubscription {
+  plan: SubscriptionPlan;
+  billingStatus: BillingStatus;
+  /** What the founder is charging this restaurant per month, in whole AED.
+   *  Defaults to the plan's list price but editable per tenant. */
+  monthlyFeeAed: number;
+  /** Epoch ms the current paid period runs until; `null` while trialing
+   *  or when the founder hasn't set one. Purely informational — nothing
+   *  auto-charges or auto-suspends (manual billing, ADR-12). */
+  currentPeriodEnd: number | null;
+  /** Free-text founder note (last payment ref, special terms, …). */
+  notes: string;
+}
+
+export interface Tenant {
+  name: string;
+  displayName: string;
+  slug: string;
+  status: TenantStatus;
+  /** UAE registered legal entity name and Tax Registration Number —
+   *  shown on the tenant detail card, not validated beyond non-empty. */
+  legalEntity: string;
+  trn: string;
+  city: string;
+  ownerName: string;
+  ownerEmail: string;
+  /** The branch created alongside the tenant at onboarding — the one the
+   *  first owner account is scoped to. */
+  primaryBranchId: string;
+  subscription: TenantSubscription;
+  createdAt: number;
+  /** The platform (founder) uid that ran `createTenant`. */
+  createdByPlatformUid: string;
+  suspendedAt: number | null;
+  suspendReason: string;
+}
+
+/** Browser-safe row for the `/admin` tenant directory table. */
+export interface TenantSummary {
+  id: string;
+  name: string;
+  slug: string;
+  status: TenantStatus;
+  plan: SubscriptionPlan;
+  billingStatus: BillingStatus;
+  monthlyFeeAed: number;
+  ownerName: string;
+  ownerEmail: string;
+  city: string;
+  branchCount: number;
+  createdAt: number;
+}
+
 export interface ModifierOption {
   id: string;
   name: LocalizedText;
