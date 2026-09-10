@@ -72,7 +72,7 @@ export function GuestLandingView({ slug }: { slug: string }) {
   ];
 
   return (
-    <div dir={dir} className="flex min-h-dvh flex-col bg-[#FAF9F6] pb-40 font-body">
+    <div dir={dir} className="flex min-h-dvh flex-col bg-[#FAF9F6] pb-56 font-body">
       {/* Hero identity card */}
       <section className="relative mb-4 overflow-hidden rounded-b-2xl bg-white shadow-sm">
         <div

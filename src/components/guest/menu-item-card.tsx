@@ -3,18 +3,15 @@
 /**
  * src/components/guest/menu-item-card.tsx
  *
- * Guest surface (RULES.md §3): 48×48px minimum on the Add control, no
- * directional (pl-/pr-/left-/right-) utilities — this component uses only
- * flex `gap`, which is inherently RTL-safe, so no logical-property
- * overrides are needed here.
+ * Guest menu row, rebuilt to the Stitch "menu browsing / quick cart"
+ * card: title + optional badge + 2-line description + coral price on the
+ * start edge, a 96×96 photo (or a coral illustration tile when the item
+ * has no `imageUrl`) with an overlaid quick-add `+` on the end edge.
  *
- * STYLING NOTE: colors below use Tailwind arbitrary-value hex (`bg-[#…]`)
- * as a stated, temporary exception to RULES.md §1.6/§3.5 ("never a raw hex
- * value outside the theme token definitions"). `tailwind.config.ts` and
- * the `data-surface="guest"` CSS custom properties (ARCHITECTURE.md §7.3)
- * don't exist in this workspace yet, so there is no `bg-primary`-style
- * semantic class to point at. Every hex value here must be replaced with
- * its semantic equivalent the moment those two files are built.
+ * RTL-safe: only flex `gap` + logical `text-start`, no `pl-/pr-/left-/
+ * right-` — the whole guest surface must mirror unmodified under عربي.
+ * The 48×48 minimum touch target is preserved on the add control even
+ * though the visible circle is smaller (RULES.md §3).
  */
 
 import { useState } from 'react';
@@ -34,36 +31,49 @@ export function MenuItemCard({ item }: { item: MenuItem }) {
   }
 
   return (
-    <li className="flex items-center gap-3 rounded-xl border border-[#ECE7E1] bg-white p-3">
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
+    <li className="flex items-stretch gap-3 rounded-xl bg-white p-3.5 text-start shadow-sm">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <h3 className="truncate font-heading text-[16px] font-semibold text-[#1F2937]">{item.name}</h3>
+
         {item.badge ? (
-          <span className="w-fit rounded-full bg-[#FFF5F2] px-2 py-0.5 text-[11px] font-semibold text-[#E85D3F]">
+          <span className="mt-1 w-fit rounded bg-[#FFF5F2] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#FF6B4A]">
             {item.badge}
           </span>
         ) : null}
 
-        <p className="truncate text-[15px] font-semibold text-[#1F2937]">{item.name}</p>
-
-        {item.dietaryTag ? (
-          <span className="w-fit rounded-full border border-[#4E937A]/30 bg-[#4E937A]/10 px-2 py-0.5 text-[11px] font-medium text-[#4E937A]">
-            {item.dietaryTag}
-          </span>
+        {item.description ? (
+          <p className="mt-1 line-clamp-2 text-xs text-[#6B7280]">{item.description}</p>
         ) : null}
 
-        <p className="text-sm font-semibold text-[#1F2937]">{formatMoney(item.priceFils, currency)}</p>
+        <div className="mt-auto flex items-center gap-2 pt-2">
+          <span className="font-heading text-[16px] font-bold text-[#FF6B4A]">
+            {formatMoney(item.priceFils, currency)}
+          </span>
+          {item.dietaryTag ? (
+            <span className="text-[11px] font-medium text-[#10B981]">{item.dietaryTag}</span>
+          ) : null}
+        </div>
       </div>
 
-      <button
-        type="button"
-        onClick={handleAdd}
-        aria-label={`Add ${item.name} to cart`}
-        className={[
-          'flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-2xl font-semibold text-white transition-transform active:scale-95',
-          justAdded ? 'bg-[#4E937A]' : 'bg-[#E85D3F]',
-        ].join(' ')}
-      >
-        <span aria-hidden="true">{justAdded ? '✓' : '+'}</span>
-      </button>
+      <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-[#FFF5F2]">
+        {item.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" />
+        ) : (
+          <span className="flex h-full w-full items-center justify-center text-2xl text-[#FF6B4A]/50">🍽️</span>
+        )}
+        <button
+          type="button"
+          onClick={handleAdd}
+          aria-label={`Add ${item.name}`}
+          className={[
+            'absolute bottom-1 right-1 flex h-10 w-10 items-center justify-center rounded-full text-xl font-semibold text-white shadow-md transition-transform active:scale-90',
+            justAdded ? 'bg-[#10B981]' : 'bg-[#FF6B4A]',
+          ].join(' ')}
+        >
+          <span aria-hidden="true">{justAdded ? '✓' : '+'}</span>
+        </button>
+      </div>
     </li>
   );
 }

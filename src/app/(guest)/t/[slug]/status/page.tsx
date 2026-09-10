@@ -1,23 +1,25 @@
 import { bootGuestPage } from '@/server/services/guest-boot.service';
 import { GenericUnavailable, TableFull, MoveConfirm } from '@/components/guest/guest-boot-states';
 import { GuestSessionProvider } from '@/components/providers/guest-session-provider';
-import { GuestMenuBrowseView } from '@/components/guest/guest-menu-browse-view';
+import { OrderTrackerView } from '@/components/guest/order-tracker-view';
 
 /**
- * src/app/(guest)/t/[slug]/menu/page.tsx
+ * src/app/(guest)/t/[slug]/status/page.tsx
  *
- * Screen 2 of the guest flow — the full per-category menu. Runs the same
- * `bootGuestPage` chain as the landing (`../page.tsx`) and the cart
- * (`../cart/page.tsx`); see `guest-boot.service.ts` for why that logic
- * is shared rather than re-derived per route.
+ * Screen 4 of the guest flow — order confirmation + live prep tracker.
+ * `?r=<orderRequestId>` is handed over by the cart on Place Order;
+ * `?o=<orderId>` addresses a priced order directly. Same shared
+ * `bootGuestPage` chain as every other guest route.
  */
 
 interface RouteParams {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ r?: string; o?: string }>;
 }
 
-export default async function GuestMenuPage({ params }: RouteParams) {
+export default async function GuestOrderStatusPage({ params, searchParams }: RouteParams) {
   const { slug } = await params;
+  const { r, o } = await searchParams;
   const boot = await bootGuestPage(slug);
 
   if (boot.kind === 'unavailable') return <GenericUnavailable />;
@@ -28,7 +30,7 @@ export default async function GuestMenuPage({ params }: RouteParams) {
 
   return (
     <GuestSessionProvider customToken={boot.customToken} context={boot.context}>
-      <GuestMenuBrowseView slug={slug} />
+      <OrderTrackerView slug={slug} requestId={r ?? null} orderId={o ?? null} />
     </GuestSessionProvider>
   );
 }
