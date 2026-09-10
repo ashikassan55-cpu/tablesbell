@@ -79,6 +79,7 @@ export function PlatformLoginForm() {
       });
 
       if (!res.ok) {
+        const detail = (await res.json().catch(() => null)) as { signedInAs?: string | null } | null;
         // Rejected account — don't leave it signed in on this device.
         try {
           await signOut(auth);
@@ -87,7 +88,9 @@ export function PlatformLoginForm() {
         }
         setState({
           status: 'error',
-          message: 'This Google account is not authorised for the founder console.',
+          message: detail?.signedInAs
+            ? `Signed in as ${detail.signedInAs} — that account is not on the founder allowlist.`
+            : 'This Google account is not authorised for the founder console.',
         });
         return;
       }

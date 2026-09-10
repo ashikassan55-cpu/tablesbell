@@ -6,11 +6,9 @@
  * `middleware.ts` gates `/admin/*` on.
  *
  * THE GATE IS AN EMAIL ALLOWLIST (DECISIONS.md ADR-12, revised): the
- * token must be a verified Google identity whose email equals
- * `ADMIN_EMAIL` (falling back to the founder's address if the env var is
- * unset). No password, no `plat` custom claim, no CLI grant script — a
- * valid Firebase user whose email isn't on the list is rejected exactly
- * like a bad token.
+ * token must be a verified identity whose email equals `ADMIN_EMAIL`
+ * (env var; an unset OR empty value falls back to the founder's
+ * address). No password, no `plat` custom claim, no CLI grant script.
  *
  * Node runtime (Route Handlers default to Node) — `firebase-admin` fine.
  */
@@ -23,7 +21,9 @@ import {
   PLATFORM_SESSION_COOKIE_OPTIONS,
 } from '@/server/auth/platform-session-cookie';
 
-const ADMIN_EMAIL = (process.env.ADMIN_EMAIL ?? 'ashikassan55@gmail.com').trim().toLowerCase();
+// `||` not `??` on purpose: an empty-string env var (a blank field in
+// the Vercel dashboard) must fall back too, not become an allowlist of "".
+const ADMIN_EMAIL = ((process.env.ADMIN_EMAIL ?? '').trim().toLowerCase() || 'ashikassan55@gmail.com');
 
 export async function POST(request: NextRequest) {
   let body: unknown;
@@ -39,19 +39,34 @@ export async function POST(request: NextRequest) {
 
   let decoded;
   try {
-    decoded = await adminAuth.verifyIdToken(idToken, true);
-  } catch {
-    return NextResponse.json({ outcome: 'denied' }, { status: 401 });
+    // No `checkRevoked` — this token was minted seconds ago by the popup,
+    // and nothing in this codebase revokes founder tokens. Keeps the
+    // verify to a single offline signature check, no extra network hop.
+    decoded = await adminAuth.verifyIdToken(idToken);
+  } catch (error) {
+    console.warn('[admin/session] verifyIdToken failed:', error instanceof Error ? error.message : error);
+    return NextResponse.json({ outcome: 'denied', message: 'Could not verify the sign-in.' }, { status: 401 });
   }
 
   const email = typeof decoded.email === 'string' ? decoded.email.trim().toLowerCase() : '';
   const emailVerified = decoded.email_verified === true;
-  const provider = decoded.firebase?.sign_in_provider;
 
-  // Verified Google identity, on the allowlist. Uniform 401 for every
-  // other case — no oracle for "account exists but isn't the founder".
-  if (provider !== 'google.com' || !emailVerified || !email || email !== ADMIN_EMAIL) {
-    return NextResponse.json({ outcome: 'denied', message: 'Unauthorized.' }, { status: 401 });
+  if (!email || !emailVerified || email !== ADMIN_EMAIL) {
+    console.warn(
+      `[admin/session] denied: signedInAs="${email || '(no email on token)'}" verified=${emailVerified} ` +
+        `allowlist="${ADMIN_EMAIL}" provider="${decoded.firebase?.sign_in_provider ?? '?'}"`,
+    );
+    return NextResponse.json(
+      {
+        outcome: 'denied',
+        message: 'This account is not on the founder allowlist.',
+        // The caller just authenticated as this address — echoing it back
+        // to them is not a disclosure, and it makes "Google picked the
+        // wrong account" instantly obvious.
+        signedInAs: email || null,
+      },
+      { status: 401 },
+    );
   }
 
   const token = await signPlatformSessionToken({
