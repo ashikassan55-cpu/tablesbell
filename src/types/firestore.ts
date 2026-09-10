@@ -292,6 +292,9 @@ export interface BranchSettings {
   wifiPassword: string;
   heroImageUrl: string;
   kitchenStatus: KitchenStatus;
+  /** Short street address shown under the restaurant name on the QR
+   *  landing screen. Blank ⇒ the line is omitted. */
+  address: string;
 }
 
 export type OrderStatus = 'new' | 'prep' | 'ready' | 'served' | 'voided';

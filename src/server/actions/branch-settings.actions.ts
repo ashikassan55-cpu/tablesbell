@@ -24,6 +24,7 @@ import {
   MAX_RECEIPT_FOOTER,
   MAX_WIFI_SSID,
   MAX_WIFI_PASSWORD,
+  MAX_ADDRESS,
   cleanImageUrl,
 } from '@/lib/branch-settings';
 import type { BranchSettings, KitchenStatus } from '@/types/firestore';
@@ -68,6 +69,7 @@ export interface UpdateBranchSettingsInput {
   wifiPassword?: string;
   heroImageUrl?: string;
   kitchenStatus?: KitchenStatus;
+  address?: string;
 }
 
 export type UpdateBranchSettingsResult =
@@ -122,6 +124,7 @@ export async function updateBranchSettings(
   const heroImageUrl = cleanImageUrl(input.heroImageUrl);
   const kitchenStatus: KitchenStatus =
     input.kitchenStatus === 'busy' || input.kitchenStatus === 'closed' ? input.kitchenStatus : 'live';
+  const address = cleanText(input.address, MAX_ADDRESS);
 
   const settings: BranchSettings = {
     currency,
@@ -131,6 +134,7 @@ export async function updateBranchSettings(
     wifiPassword,
     heroImageUrl,
     kitchenStatus,
+    address,
   };
 
   await adminDb.doc(`tenants/${session.tid}/branches/${branchId}`).set(

@@ -48,7 +48,7 @@ function GuestStatusShell({ message }: { message: string }) {
   );
 }
 
-export function GuestMenuView() {
+export function GuestMenuView(_props: { slug?: string } = {}) {
   const session = useGuestSession();
   const menu = useLiveMenu(session.tenantId, session.branchId, session.menuVersion, session.authReady);
 

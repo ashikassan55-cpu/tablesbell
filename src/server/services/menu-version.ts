@@ -41,3 +41,27 @@ export async function resolveBranchSettingsFor(
   const branchSnap = await adminDb.doc(`tenants/${tenantId}/branches/${branchId}`).get();
   return resolveBranchSettings((branchSnap.data() as { settings?: unknown } | undefined)?.settings);
 }
+
+/**
+ * One branch-doc read for the guest boot context — `menuVersion` +
+ * normalised `settings` + the display name shown on the QR landing.
+ * Collapses the two separate `branchSnap` reads the guest boot used to
+ * do (`resolveMenuVersion` + `resolveBranchSettingsFor`) into one.
+ */
+export async function resolveBranchGuestContextFor(
+  tenantId: string,
+  branchId: string,
+): Promise<{ menuVersion: number; settings: BranchSettings; name: string }> {
+  const snap = await adminDb.doc(`tenants/${tenantId}/branches/${branchId}`).get();
+  const data = (snap.data() ?? {}) as {
+    menuVersion?: number;
+    settings?: unknown;
+    name?: string;
+    displayName?: string;
+  };
+  return {
+    menuVersion: data.menuVersion ?? 1,
+    settings: resolveBranchSettings(data.settings),
+    name: (data.displayName || data.name || '').toString(),
+  };
+}

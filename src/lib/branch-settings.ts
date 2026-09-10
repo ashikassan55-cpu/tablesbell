@@ -23,6 +23,7 @@ export const DEFAULT_BRANCH_SETTINGS: BranchSettings = {
   wifiPassword: '',
   heroImageUrl: '',
   kitchenStatus: 'live',
+  address: '',
 };
 
 export const SUPPORTED_CURRENCIES: readonly string[] = Object.keys(CURRENCIES);
@@ -32,6 +33,7 @@ export const MAX_VAT_PERCENT = 30;
 export const MAX_WIFI_SSID = 64;
 export const MAX_WIFI_PASSWORD = 128;
 export const MAX_IMAGE_URL = 600;
+export const MAX_ADDRESS = 160;
 export const KITCHEN_STATUSES: readonly KitchenStatus[] = ['live', 'busy', 'closed'];
 
 /** http(s) image URLs only — never `javascript:` / `data:` — length-capped.
@@ -73,5 +75,15 @@ export function resolveBranchSettings(raw: unknown): BranchSettings {
   const heroImageUrl = cleanImageUrl(s.heroImageUrl);
   const kitchenStatus: KitchenStatus =
     s.kitchenStatus === 'busy' || s.kitchenStatus === 'closed' ? s.kitchenStatus : 'live';
-  return { currency, vatPpm, receiptFooter, wifiSsid, wifiPassword, heroImageUrl, kitchenStatus };
+  const address = typeof s.address === 'string' ? s.address.slice(0, MAX_ADDRESS) : '';
+  return {
+    currency,
+    vatPpm,
+    receiptFooter,
+    wifiSsid,
+    wifiPassword,
+    heroImageUrl,
+    kitchenStatus,
+    address,
+  };
 }

@@ -1,7 +1,7 @@
 import { bootGuestPage } from '@/server/services/guest-boot.service';
 import { GenericUnavailable, TableFull, MoveConfirm } from '@/components/guest/guest-boot-states';
 import { GuestSessionProvider } from '@/components/providers/guest-session-provider';
-import { GuestMenuView } from '@/components/guest/guest-menu-view';
+import { GuestLandingView } from '@/components/guest/guest-landing-view';
 
 /**
  * src/app/(guest)/t/[slug]/page.tsx
@@ -41,7 +41,7 @@ export default async function GuestTablePage({ params }: RouteParams) {
 
   return (
     <GuestSessionProvider customToken={boot.customToken} context={boot.context}>
-      <GuestMenuView />
+      <GuestLandingView slug={slug} />
     </GuestSessionProvider>
   );
 }

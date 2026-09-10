@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { resolveTableSlug } from '@/server/services/slug.service';
 import { checkGuestBoot, resolveGuestSession } from '@/server/services/session.service';
-import { resolveMenuVersion, resolveBranchSettingsFor } from '@/server/services/menu-version';
+import { resolveBranchGuestContextFor } from '@/server/services/menu-version';
 import { mintGuestSessionToken } from '@/server/auth/mint-guest-session';
 import { verifyDeviceToken, DEVICE_COOKIE_NAME } from '@/server/auth/device-cookie';
 import type { GuestSessionContext } from '@/components/providers/guest-session-provider';
@@ -91,10 +91,8 @@ export async function bootGuestPage(slug: string): Promise<GuestPageBoot> {
   }
 
   // resolution.outcome is 'resumed' | 'created' from here on.
-  const [menuVersion, branchSettings] = await Promise.all([
-    resolveMenuVersion(location.tenantId, location.branchId),
-    resolveBranchSettingsFor(location.tenantId, location.branchId),
-  ]);
+  const branch = await resolveBranchGuestContextFor(location.tenantId, location.branchId);
+  const { menuVersion, settings: branchSettings } = branch;
 
   const minted = await mintGuestSessionToken({
     tenantId: location.tenantId,
@@ -119,6 +117,12 @@ export async function bootGuestPage(slug: string): Promise<GuestPageBoot> {
       menuVersion,
       currency: branchSettings.currency, // ADR-11
       vatPpm: branchSettings.vatPpm,
+      restaurantName: branch.name || resolution.tableCode,
+      restaurantAddress: branchSettings.address,
+      wifiSsid: branchSettings.wifiSsid,
+      wifiPassword: branchSettings.wifiPassword,
+      heroImageUrl: branchSettings.heroImageUrl,
+      kitchenStatus: branchSettings.kitchenStatus,
     },
   };
 }

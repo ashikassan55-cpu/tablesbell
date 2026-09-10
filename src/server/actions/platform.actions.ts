@@ -175,6 +175,7 @@ export async function createTenant(input: CreateTenantInput): Promise<CreateTena
       wifiPassword: '',
       heroImageUrl: '',
       kitchenStatus: 'live',
+      address: '',
     },
     session: { maxPartiesPerTable: 6 },
     sla: { ticketPrepSec: 900 },

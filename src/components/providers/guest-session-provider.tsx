@@ -39,6 +39,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { signInWithCustomToken } from 'firebase/auth';
 import { auth } from '@/lib/firebase/client';
+import type { KitchenStatus } from '@/types/firestore';
 
 export interface GuestSessionContext {
   tenantId: string;
@@ -71,6 +72,20 @@ export interface GuestSessionContext {
    */
   currency: string;
   vatPpm: number;
+  /**
+   * Guest-experience fields (Stitch guest ordering), resolved server-side
+   * once from `branches/{b}` + `.settings`, same "not live-listened"
+   * trade-off as `currency` / `menuVersion`. `restaurantName` falls back
+   * to the branch/tenant display name; the rest are blank when a manager
+   * has not filled them in (the landing hides the Wi-Fi tile / uses a
+   * gradient hero accordingly).
+   */
+  restaurantName: string;
+  restaurantAddress: string;
+  wifiSsid: string;
+  wifiPassword: string;
+  heroImageUrl: string;
+  kitchenStatus: KitchenStatus;
 }
 
 export interface GuestSessionContextValue extends GuestSessionContext {

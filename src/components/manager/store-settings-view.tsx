@@ -22,6 +22,7 @@ import {
   MAX_WIFI_SSID,
   MAX_WIFI_PASSWORD,
   MAX_IMAGE_URL,
+  MAX_ADDRESS,
   SUPPORTED_CURRENCIES,
   vatPercentToPpm,
   vatPpmToPercent,
@@ -37,6 +38,7 @@ interface FormState {
   wifiPassword: string;
   heroImageUrl: string;
   kitchenStatus: KitchenStatus;
+  address: string;
 }
 
 const KITCHEN_STATUS_LABEL: Record<KitchenStatus, string> = {
@@ -92,6 +94,7 @@ export function StoreSettingsView({
         wifiPassword: live.settings.wifiPassword,
         heroImageUrl: live.settings.heroImageUrl,
         kitchenStatus: live.settings.kitchenStatus,
+        address: live.settings.address,
       });
       syncedStamp.current = stamp;
     }
@@ -117,6 +120,7 @@ export function StoreSettingsView({
       wifiPassword: form.wifiPassword,
       heroImageUrl: form.heroImageUrl,
       kitchenStatus: form.kitchenStatus,
+      address: form.address,
     });
     if (!mountedRef.current) return;
     setBusy(false);
@@ -211,6 +215,16 @@ export function StoreSettingsView({
       <section className="rounded-lg border border-[#E5E7EB] bg-white p-4">
         <h2 className="text-sm font-semibold text-[#1F2937]">Guest experience</h2>
         <p className="mt-0.5 text-xs text-[#6B7280]">Shown on the QR landing &amp; menu screens guests see when they scan a table.</p>
+
+        <label className="mt-3 flex flex-col text-xs text-[#6B7280]">
+          Street address (shown under the name)
+          <input
+            value={form.address}
+            onChange={(e) => set('address', e.target.value.slice(0, MAX_ADDRESS))}
+            placeholder="Warehouse 48, Al Quoz 1"
+            className="mt-0.5 h-10 rounded-md border border-[#E5E7EB] px-2 text-sm text-[#1F2937]"
+          />
+        </label>
 
         <label className="mt-3 flex flex-col text-xs text-[#6B7280]">
           Kitchen status
