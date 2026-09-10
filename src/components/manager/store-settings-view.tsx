@@ -19,17 +19,31 @@ import { updateBranchSettings } from '@/server/actions/branch-settings.actions';
 import { CURRENCIES, formatMoney } from '@/lib/format/money';
 import {
   MAX_RECEIPT_FOOTER,
+  MAX_WIFI_SSID,
+  MAX_WIFI_PASSWORD,
+  MAX_IMAGE_URL,
   SUPPORTED_CURRENCIES,
   vatPercentToPpm,
   vatPpmToPercent,
 } from '@/lib/branch-settings';
+import type { KitchenStatus } from '@/types/firestore';
 
 interface FormState {
   name: string;
   currency: string;
   vatPercent: string;
   receiptFooter: string;
+  wifiSsid: string;
+  wifiPassword: string;
+  heroImageUrl: string;
+  kitchenStatus: KitchenStatus;
 }
+
+const KITCHEN_STATUS_LABEL: Record<KitchenStatus, string> = {
+  live: 'Live & Ready — taking orders',
+  busy: 'Busy — longer waits',
+  closed: 'Closed — kitchen not accepting orders',
+};
 
 function reasonText(reason: string): string {
   switch (reason) {
@@ -74,6 +88,10 @@ export function StoreSettingsView({
         currency: live.settings.currency,
         vatPercent: String(vatPpmToPercent(live.settings.vatPpm)),
         receiptFooter: live.settings.receiptFooter,
+        wifiSsid: live.settings.wifiSsid,
+        wifiPassword: live.settings.wifiPassword,
+        heroImageUrl: live.settings.heroImageUrl,
+        kitchenStatus: live.settings.kitchenStatus,
       });
       syncedStamp.current = stamp;
     }
@@ -95,6 +113,10 @@ export function StoreSettingsView({
       currency: form.currency,
       vatPpm: vatPercentToPpm(Number.parseFloat(form.vatPercent)),
       receiptFooter: form.receiptFooter,
+      wifiSsid: form.wifiSsid,
+      wifiPassword: form.wifiPassword,
+      heroImageUrl: form.heroImageUrl,
+      kitchenStatus: form.kitchenStatus,
     });
     if (!mountedRef.current) return;
     setBusy(false);
@@ -184,6 +206,63 @@ export function StoreSettingsView({
           <span className="font-semibold text-[#1F2937]">{formatMoney(previewGross - previewNet, form.currency)}</span> tax
           (VAT-inclusive pricing).
         </p>
+      </section>
+
+      <section className="rounded-lg border border-[#E5E7EB] bg-white p-4">
+        <h2 className="text-sm font-semibold text-[#1F2937]">Guest experience</h2>
+        <p className="mt-0.5 text-xs text-[#6B7280]">Shown on the QR landing &amp; menu screens guests see when they scan a table.</p>
+
+        <label className="mt-3 flex flex-col text-xs text-[#6B7280]">
+          Kitchen status
+          <select
+            value={form.kitchenStatus}
+            onChange={(e) => set('kitchenStatus', e.target.value as KitchenStatus)}
+            className="mt-0.5 h-10 rounded-md border border-[#E5E7EB] px-2 text-sm text-[#1F2937]"
+          >
+            {(Object.keys(KITCHEN_STATUS_LABEL) as KitchenStatus[]).map((k) => (
+              <option key={k} value={k}>
+                {KITCHEN_STATUS_LABEL[k]}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <div className="mt-3 flex gap-2">
+          <label className="flex flex-1 flex-col text-xs text-[#6B7280]">
+            Guest Wi-Fi name
+            <input
+              value={form.wifiSsid}
+              onChange={(e) => set('wifiSsid', e.target.value.slice(0, MAX_WIFI_SSID))}
+              placeholder="Alserkal_Guest"
+              className="mt-0.5 h-10 rounded-md border border-[#E5E7EB] px-2 text-sm text-[#1F2937]"
+            />
+          </label>
+          <label className="flex flex-1 flex-col text-xs text-[#6B7280]">
+            Wi-Fi password
+            <input
+              value={form.wifiPassword}
+              onChange={(e) => set('wifiPassword', e.target.value.slice(0, MAX_WIFI_PASSWORD))}
+              placeholder="Leave blank for open network"
+              className="mt-0.5 h-10 rounded-md border border-[#E5E7EB] px-2 text-sm text-[#1F2937]"
+            />
+          </label>
+        </div>
+        <span className="mt-1 block text-[10px] text-[#9CA3AF]">
+          Leave the name blank to hide the Wi-Fi tile. The landing shows a “tap to copy” button; the password is never shown in plain text.
+        </span>
+
+        <label className="mt-3 flex flex-col text-xs text-[#6B7280]">
+          Hero image URL
+          <input
+            value={form.heroImageUrl}
+            onChange={(e) => set('heroImageUrl', e.target.value.slice(0, MAX_IMAGE_URL))}
+            placeholder="https://…/cafe-photo.jpg"
+            className="mt-0.5 h-10 rounded-md border border-[#E5E7EB] px-2 text-sm text-[#1F2937]"
+          />
+          <span className="mt-0.5 text-[10px] text-[#9CA3AF]">
+            Wide photo shown at the top of the landing screen. https:// only. Blank = a warm coral gradient.
+          </span>
+        </label>
       </section>
 
       {feedback ? (

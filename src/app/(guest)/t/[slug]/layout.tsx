@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { CartProvider } from '@/components/providers/cart-provider';
+import { GuestLocaleProvider } from '@/components/providers/guest-locale-provider';
 
 /**
  * src/app/(guest)/t/[slug]/layout.tsx
@@ -24,5 +25,9 @@ import { CartProvider } from '@/components/providers/cart-provider';
  */
 
 export default function GuestTableLayout({ children }: { children: ReactNode }) {
-  return <CartProvider>{children}</CartProvider>;
+  return (
+    <GuestLocaleProvider>
+      <CartProvider>{children}</CartProvider>
+    </GuestLocaleProvider>
+  );
 }

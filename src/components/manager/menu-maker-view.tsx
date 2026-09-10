@@ -556,6 +556,9 @@ function ItemEditor({
   const [sku, setSku] = useState(initial?.sku ?? '');
   const [station, setStation] = useState(initial?.stationId ?? 'kitchen');
   const [status, setStatus] = useState<MenuItemStatus>(initial?.status ?? 'active');
+  const [imageUrl, setImageUrl] = useState(initial?.imageUrl ?? '');
+  const [descEn, setDescEn] = useState(initial?.description?.en ?? '');
+  const [descAr, setDescAr] = useState(initial?.description?.ar ?? '');
   const [err, setErr] = useState<string | null>(null);
 
   const F = 'mt-0.5 h-10 rounded-lg border border-[#E5E7EB] bg-white px-2 text-sm text-[#1F2937]';
@@ -573,6 +576,8 @@ function ItemEditor({
       stationId: station.trim() || 'kitchen',
       status,
       modifierGroups: initial?.modifierGroups ?? [],
+      imageUrl: imageUrl.trim(),
+      description: { en: descEn.trim(), ar: descAr.trim() },
     });
   }
 
@@ -605,6 +610,35 @@ function ItemEditor({
           <label className={L}>
             الاسم (AR)
             <input value={ar} onChange={(e) => setAr(e.target.value)} dir="rtl" className={F} />
+          </label>
+          <label className={L}>
+            Description (EN)
+            <textarea
+              value={descEn}
+              onChange={(e) => setDescEn(e.target.value.slice(0, 240))}
+              rows={2}
+              placeholder="Shown under the item name on the guest menu"
+              className="mt-0.5 rounded-lg border border-[#E5E7EB] bg-white p-2 text-sm text-[#1F2937]"
+            />
+          </label>
+          <label className={L}>
+            الوصف (AR)
+            <textarea
+              value={descAr}
+              onChange={(e) => setDescAr(e.target.value.slice(0, 240))}
+              rows={2}
+              dir="rtl"
+              className="mt-0.5 rounded-lg border border-[#E5E7EB] bg-white p-2 text-sm text-[#1F2937]"
+            />
+          </label>
+          <label className={L}>
+            Photo URL
+            <input
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value.slice(0, 600))}
+              placeholder="https://…/dish.jpg"
+              className={F}
+            />
           </label>
           <div className="flex gap-2">
             <label className={`${L} flex-1`}>

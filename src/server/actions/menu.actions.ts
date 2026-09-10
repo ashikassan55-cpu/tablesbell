@@ -40,6 +40,7 @@ import { cookies } from 'next/headers';
 import { adminDb } from '@/lib/firebase/admin';
 import { verifyStaffSessionToken, STAFF_SESSION_COOKIE_NAME } from '@/server/auth/staff-session-cookie';
 import { canManageMenu } from '@/lib/console/staff-permissions';
+import { cleanImageUrl } from '@/lib/branch-settings';
 import type {
   LocalizedText,
   MenuItem,
@@ -184,6 +185,8 @@ function sanitizeCategories(raw: unknown): SanitizeOk | SanitizeErr {
         stationId: cleanText(it.stationId, MAX_STATION) || 'kitchen',
         status,
         modifierGroups: sanitizeGroups(it.modifierGroups),
+        imageUrl: cleanImageUrl(it.imageUrl),
+        description: cleanLocalized(it.description) ?? { en: '', ar: '' },
       });
       totalItems += 1;
       if (totalItems > MAX_TOTAL_ITEMS) return { ok: false, reason: 'TOO_MANY_ITEMS_TOTAL' };

@@ -30,7 +30,7 @@
 
 import type { DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import type { TableWithId } from '@/components/cashier/table-card';
-import type { GuestSession, StaffAlert, Table } from '@/types/firestore';
+import type { GuestSession, ServiceCall, StaffAlert, Table } from '@/types/firestore';
 
 export interface SessionWithId extends GuestSession {
   id: string;
@@ -73,5 +73,10 @@ export function convertSessionSnapshot(doc: QueryDocumentSnapshot<DocumentData>)
 
 export function convertAlertSnapshot(doc: QueryDocumentSnapshot<DocumentData>): StaffAlert {
   const data = doc.data() as unknown as StaffAlert;
+  return { ...data, id: doc.id, createdAt: toMillisMaybe(data.createdAt) ?? 0 };
+}
+
+export function convertServiceCallSnapshot(doc: QueryDocumentSnapshot<DocumentData>): ServiceCall {
+  const data = doc.data() as unknown as ServiceCall;
   return { ...data, id: doc.id, createdAt: toMillisMaybe(data.createdAt) ?? 0 };
 }

@@ -149,6 +149,11 @@ export interface MenuItem {
   stationId: string;
   status: MenuItemStatus;
   modifierGroups: ModifierGroup[];
+  /** Guest-menu presentation (Stitch guest ordering). Both optional — an
+   *  item with neither still renders (no photo → coral illustration tile,
+   *  no description → title + price only). */
+  imageUrl?: string;
+  description?: LocalizedText;
 }
 
 /**
@@ -270,10 +275,23 @@ export interface StaffMemberSummary {
  * SNAPSHOTS `currency` + `vatPpm` onto every `Order` at price time, so a
  * mid-meal settings change never retro-alters an existing ticket or bill.
  */
+export type KitchenStatus = 'live' | 'busy' | 'closed';
+
 export interface BranchSettings {
   currency: string; // ISO-4217-ish code: 'AED' | 'USD' | 'GBP' | 'EUR' | 'SAR'
   vatPpm: number;
   receiptFooter: string;
+  /**
+   * Guest-experience fields shown on the QR landing / menu screens
+   * (Stitch "TableBells Guest Ordering"). All empty-string / 'live'
+   * defaults so a branch that never fills them in still renders — the
+   * landing hides the Wi-Fi pill when `wifiSsid` is blank and uses a
+   * coral gradient when `heroImageUrl` is blank.
+   */
+  wifiSsid: string;
+  wifiPassword: string;
+  heroImageUrl: string;
+  kitchenStatus: KitchenStatus;
 }
 
 export type OrderStatus = 'new' | 'prep' | 'ready' | 'served' | 'voided';
@@ -457,6 +475,31 @@ export interface StaffAlert {
   status: StaffAlertStatus;
   /** Set when the alert is resolved (Cashier/Waiter "Dismiss", or a
    *  future auto-resolve). Absent while `status === 'open'`. */
+  resolvedByUid?: string | null;
+  resolvedAt?: number | null;
+}
+
+/**
+ * `tenants/{t}/branches/{b}/serviceCalls/{c}` — a guest-raised assistance
+ * request from the QR ordering surface (Stitch guest ordering: "Call
+ * Waiter", "Free Water", "Ring Service Bell", the tracker's "Need
+ * anything else?"). The guest writes it directly via the client SDK
+ * (`firestore.rules` already gates `create` — `isGuest`, `inParty`,
+ * `partyOpen`, the fixed `type` enum and key set). Staff acknowledge /
+ * resolve it via the Admin SDK only (`resolveServiceCall`); it surfaces
+ * live in the Cashier "Alerts & Pagers" tab.
+ */
+export type ServiceCallType = 'waiter' | 'water' | 'bill' | 'cleanup' | 'napkins' | 'assistance';
+
+export interface ServiceCall {
+  id: string;
+  sessionId: string;
+  tableId: string;
+  type: ServiceCallType;
+  note: string;
+  createdBy: string;
+  createdAt: number;
+  status: 'open' | 'resolved';
   resolvedByUid?: string | null;
   resolvedAt?: number | null;
 }

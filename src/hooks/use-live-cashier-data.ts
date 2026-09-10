@@ -63,11 +63,12 @@ import {
   convertTableSnapshot,
   convertSessionSnapshot,
   convertAlertSnapshot,
+  convertServiceCallSnapshot,
   type SessionWithId,
 } from '@/hooks/live-snapshots';
 import type { TableWithId } from '@/components/cashier/table-card';
 import type { OrderWithId } from '@/components/ops/ticket-card';
-import type { StaffAlert } from '@/types/firestore';
+import type { ServiceCall, StaffAlert } from '@/types/firestore';
 
 export type { SessionWithId };
 
@@ -82,6 +83,7 @@ export type LiveCashierState = {
   sessions: SessionWithId[];
   orders: OrderWithId[];
   alerts: StaffAlert[];
+  serviceCalls: ServiceCall[];
   error: string | null;
 };
 
@@ -90,6 +92,7 @@ export function useLiveCashierData(tenantId: string, branchId: string): LiveCash
   const [sessions, setSessions] = useState<SessionWithId[] | null>(null);
   const [orders, setOrders] = useState<OrderWithId[] | null>(null);
   const [alerts, setAlerts] = useState<StaffAlert[] | null>(null);
+  const [serviceCalls, setServiceCalls] = useState<ServiceCall[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -97,6 +100,7 @@ export function useLiveCashierData(tenantId: string, branchId: string): LiveCash
     setSessions(null);
     setOrders(null);
     setAlerts(null);
+    setServiceCalls(null);
     setError(null);
 
     const base = `tenants/${tenantId}/branches/${branchId}`;
@@ -140,19 +144,48 @@ export function useLiveCashierData(tenantId: string, branchId: string): LiveCash
       onError,
     );
 
+    // serviceCalls — guest-raised assistance requests (Stitch guest
+    // ordering). Same single-field `status == 'open'` shape as staffAlerts,
+    // client-sorted newest-first.
+    const unsubServiceCalls = onSnapshot(
+      query(collection(db, `${base}/serviceCalls`), where('status', '==', 'open')),
+      (snap) =>
+        setServiceCalls(
+          snap.docs
+            .map(convertServiceCallSnapshot)
+            .sort((a, b) => b.createdAt - a.createdAt),
+        ),
+      onError,
+    );
+
     return () => {
       unsubTables();
       unsubSessions();
       unsubOrders();
       unsubAlerts();
+      unsubServiceCalls();
     };
   }, [tenantId, branchId]);
 
   if (error) {
-    return { status: 'error', tables: [], sessions: [], orders: [], alerts: [], error };
+    return { status: 'error', tables: [], sessions: [], orders: [], alerts: [], serviceCalls: [], error };
   }
-  if (tables === null || sessions === null || orders === null || alerts === null) {
-    return { status: 'loading', tables: [], sessions: [], orders: [], alerts: [], error: null };
+  if (
+    tables === null ||
+    sessions === null ||
+    orders === null ||
+    alerts === null ||
+    serviceCalls === null
+  ) {
+    return {
+      status: 'loading',
+      tables: [],
+      sessions: [],
+      orders: [],
+      alerts: [],
+      serviceCalls: [],
+      error: null,
+    };
   }
-  return { status: 'ready', tables, sessions, orders, alerts, error: null };
+  return { status: 'ready', tables, sessions, orders, alerts, serviceCalls, error: null };
 }

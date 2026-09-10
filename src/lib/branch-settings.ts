@@ -13,18 +13,34 @@
  */
 
 import { CURRENCIES } from '@/lib/format/money';
-import type { BranchSettings } from '@/types/firestore';
+import type { BranchSettings, KitchenStatus } from '@/types/firestore';
 
 export const DEFAULT_BRANCH_SETTINGS: BranchSettings = {
   currency: 'AED',
   vatPpm: 50_000,
   receiptFooter: '',
+  wifiSsid: '',
+  wifiPassword: '',
+  heroImageUrl: '',
+  kitchenStatus: 'live',
 };
 
 export const SUPPORTED_CURRENCIES: readonly string[] = Object.keys(CURRENCIES);
 
 export const MAX_RECEIPT_FOOTER = 240;
 export const MAX_VAT_PERCENT = 30;
+export const MAX_WIFI_SSID = 64;
+export const MAX_WIFI_PASSWORD = 128;
+export const MAX_IMAGE_URL = 600;
+export const KITCHEN_STATUSES: readonly KitchenStatus[] = ['live', 'busy', 'closed'];
+
+/** http(s) image URLs only — never `javascript:` / `data:` — length-capped.
+ *  Blank passes through as "" (the feature is simply off). */
+export function cleanImageUrl(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  const trimmed = value.trim().slice(0, MAX_IMAGE_URL);
+  return /^https?:\/\//i.test(trimmed) ? trimmed : '';
+}
 
 export function vatPercentToPpm(percent: number): number {
   if (!Number.isFinite(percent) || percent < 0) return DEFAULT_BRANCH_SETTINGS.vatPpm;
@@ -51,5 +67,11 @@ export function resolveBranchSettings(raw: unknown): BranchSettings {
       : DEFAULT_BRANCH_SETTINGS.vatPpm;
   const receiptFooter =
     typeof s.receiptFooter === 'string' ? s.receiptFooter.slice(0, MAX_RECEIPT_FOOTER) : '';
-  return { currency, vatPpm, receiptFooter };
+  const wifiSsid = typeof s.wifiSsid === 'string' ? s.wifiSsid.slice(0, MAX_WIFI_SSID) : '';
+  const wifiPassword =
+    typeof s.wifiPassword === 'string' ? s.wifiPassword.slice(0, MAX_WIFI_PASSWORD) : '';
+  const heroImageUrl = cleanImageUrl(s.heroImageUrl);
+  const kitchenStatus: KitchenStatus =
+    s.kitchenStatus === 'busy' || s.kitchenStatus === 'closed' ? s.kitchenStatus : 'live';
+  return { currency, vatPpm, receiptFooter, wifiSsid, wifiPassword, heroImageUrl, kitchenStatus };
 }

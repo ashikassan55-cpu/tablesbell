@@ -20,8 +20,13 @@ import { adminDb } from '@/lib/firebase/admin';
 import { verifyStaffSessionToken, STAFF_SESSION_COOKIE_NAME } from '@/server/auth/staff-session-cookie';
 import { canManageSettings } from '@/lib/console/staff-permissions';
 import { CURRENCIES } from '@/lib/format/money';
-import { MAX_RECEIPT_FOOTER } from '@/lib/branch-settings';
-import type { BranchSettings } from '@/types/firestore';
+import {
+  MAX_RECEIPT_FOOTER,
+  MAX_WIFI_SSID,
+  MAX_WIFI_PASSWORD,
+  cleanImageUrl,
+} from '@/lib/branch-settings';
+import type { BranchSettings, KitchenStatus } from '@/types/firestore';
 
 const MAX_NAME = 80;
 
@@ -57,6 +62,12 @@ export interface UpdateBranchSettingsInput {
    *  percent field. */
   vatPpm: number;
   receiptFooter: string;
+  /** Guest-experience fields (Stitch guest ordering). All optional —
+   *  blank turns the feature off on the landing screen. */
+  wifiSsid?: string;
+  wifiPassword?: string;
+  heroImageUrl?: string;
+  kitchenStatus?: KitchenStatus;
 }
 
 export type UpdateBranchSettingsResult =
@@ -96,7 +107,31 @@ export async function updateBranchSettings(
 
   const receiptFooter = cleanMultiline(input.receiptFooter, MAX_RECEIPT_FOOTER);
 
-  const settings: BranchSettings = { currency, vatPpm, receiptFooter };
+  const wifiSsid = cleanText(input.wifiSsid, MAX_WIFI_SSID);
+  // Wi-Fi passwords can contain spaces and symbols; only strip control chars.
+  const wifiPassword =
+    typeof input.wifiPassword === 'string'
+      ? [...input.wifiPassword]
+          .filter((ch) => {
+            const c = ch.codePointAt(0) ?? 0;
+            return c >= 0x20 && !(c >= 0x7f && c <= 0x9f);
+          })
+          .join('')
+          .slice(0, MAX_WIFI_PASSWORD)
+      : '';
+  const heroImageUrl = cleanImageUrl(input.heroImageUrl);
+  const kitchenStatus: KitchenStatus =
+    input.kitchenStatus === 'busy' || input.kitchenStatus === 'closed' ? input.kitchenStatus : 'live';
+
+  const settings: BranchSettings = {
+    currency,
+    vatPpm,
+    receiptFooter,
+    wifiSsid,
+    wifiPassword,
+    heroImageUrl,
+    kitchenStatus,
+  };
 
   await adminDb.doc(`tenants/${session.tid}/branches/${branchId}`).set(
     {

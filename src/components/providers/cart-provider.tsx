@@ -59,6 +59,8 @@ export interface MenuItem {
   priceFils: number;
   badge?: string;
   dietaryTag?: string;
+  imageUrl?: string;
+  description?: string;
 }
 
 export interface CartLine {

@@ -34,11 +34,12 @@ import { AlertsPagersView } from './alerts-pagers-view';
 import {
   callToActiveAlert,
   staffToActiveAlert,
+  serviceCallToActiveAlert,
   sortActiveAlerts,
   type ActiveAlert,
 } from './active-alert';
 import { LockSwitchButton } from '@/components/console/lock-switch-button';
-import { voidTicketLine, resolveStaffAlert } from '@/server/actions/bill.actions';
+import { voidTicketLine, resolveStaffAlert, resolveServiceCall } from '@/server/actions/bill.actions';
 import { roleLabel, type StaffIdentity } from '@/lib/console/staff-permissions';
 import { useLiveCashierData } from '@/hooks/use-live-cashier-data';
 import { formatMoney } from '@/lib/format/money';
@@ -112,12 +113,17 @@ function Body({
   const selectedTableOrders = selectedTable ? live.orders.filter((o) => o.tableId === selectedTable.id) : [];
   const visibleAlerts = live.alerts.filter((a) => !dismissedAlertIds.has(a.id));
 
-  /** Waiter calls + open staff alerts, one normalized list, most urgent first. */
+  /** Waiter calls + open staff alerts + guest service calls, one
+   *  normalized list, most urgent first. */
+  const tableCodeById = new Map(live.tables.map((t) => [t.id, t.code]));
   const activeAlerts = sortActiveAlerts([
     ...live.tables
       .filter((t) => t.activeCall && !dismissedAlertIds.has(`call:${t.id}`))
       .map((t) => callToActiveAlert(t)),
     ...visibleAlerts.map((a) => staffToActiveAlert(a)),
+    ...live.serviceCalls
+      .filter((c) => !dismissedAlertIds.has(`svc:${c.id}`))
+      .map((c) => serviceCallToActiveAlert(c, tableCodeById.get(c.tableId) ?? c.tableId)),
   ]);
 
   const zones = useMemo(() => {
@@ -163,6 +169,25 @@ function Body({
   function resolveActiveAlert(alert: ActiveAlert) {
     if (alert.staffAlert) {
       void resolveAlert(alert.staffAlert);
+      return;
+    }
+    if (alert.serviceCall) {
+      const callId = alert.serviceCall.id;
+      setDismissedAlertIds((prev) => new Set(prev).add(alert.key));
+      void resolveServiceCall({ branchId, callId }).then((result) => {
+        if (result.outcome === 'rejected') {
+          setDismissedAlertIds((prev) => {
+            const next = new Set(prev);
+            next.delete(alert.key);
+            return next;
+          });
+          setVoidStatus({
+            orderCode: alert.tableCode,
+            message: `Couldn't clear that request: ${result.reason}.`,
+            tone: 'error',
+          });
+        }
+      });
       return;
     }
     setDismissedAlertIds((prev) => new Set(prev).add(alert.key));

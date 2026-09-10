@@ -43,6 +43,7 @@
 import { useEffect, useState } from 'react';
 import { doc, onSnapshot, type FirestoreError } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
+import { useGuestLocale } from '@/components/providers/guest-locale-provider';
 import type { MenuItem as CanonicalMenuItem, AvailabilityDoc } from '@/types/firestore';
 import type { MenuItem as DisplayMenuItem } from '@/components/providers/cart-provider';
 
@@ -89,6 +90,7 @@ export function useLiveMenu(
   menuVersion: number,
   enabled: boolean,
 ): LiveMenuState {
+  const { locale } = useGuestLocale();
   const [menu, setMenu] = useState<MenuPublishedSnapshot | null>(null);
   const [availability, setAvailability] = useState<AvailabilityDoc>(EMPTY_AVAILABILITY);
   const [error, setError] = useState<string | null>(null);
@@ -140,9 +142,15 @@ export function useLiveMenu(
     return { status: 'loading', categories: [], items: [], error: null };
   }
 
+  // This hook is the one translation seam (see file header): pick the
+  // locale-appropriate string here, fall back to English, so every leaf
+  // component downstream still gets a flat `string`.
+  const loc = (t: { en: string; ar: string } | undefined | null): string =>
+    !t ? '' : (locale === 'ar' ? t.ar : t.en) || t.en || t.ar || '';
+
   const categories: LiveMenuCategory[] = menu.categories.map((category) => ({
     id: category.id,
-    label: category.name?.en?.trim() || category.id,
+    label: loc(category.name)?.trim() || category.id,
   }));
 
   const items: DisplayMenuItem[] = menu.categories.flatMap((category) =>
@@ -151,13 +159,13 @@ export function useLiveMenu(
       .map((item) => ({
         id: item.id,
         categoryId: category.id,
-        name: item.name.en,
+        name: loc(item.name) || item.name.en,
         priceFils: item.priceFils,
+        imageUrl: item.imageUrl || undefined,
+        description: loc(item.description) || undefined,
         // `badge`/`dietaryTag` (cart-provider's `MenuItem` type) have no
         // canonical schema field to source from -- the mock data had
         // them as hand-authored decoration, not real Firestore fields.
-        // Left undefined here rather than fabricated, per that type's
-        // own optionality.
       })),
   );
 

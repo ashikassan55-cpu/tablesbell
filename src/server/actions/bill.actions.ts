@@ -426,6 +426,50 @@ export async function resolveStaffAlert(input: ResolveStaffAlertInput): Promise<
   return { outcome: 'resolved' };
 }
 
+export interface ResolveServiceCallInput {
+  branchId: string;
+  callId: string;
+}
+
+export type ResolveServiceCallResult =
+  | { outcome: 'resolved' }
+  | { outcome: 'rejected'; reason: string };
+
+/**
+ * Staff acknowledge / clear a guest `serviceCalls` doc from the Cashier
+ * "Alerts & Pagers" tab. `firestore.rules` makes `serviceCalls` update
+ * `if false` for every client — the Admin SDK here is the only writer.
+ * Same shape and role gate as `resolveStaffAlert`.
+ */
+export async function resolveServiceCall(
+  input: ResolveServiceCallInput,
+): Promise<ResolveServiceCallResult> {
+  const { branchId, callId } = input;
+
+  if (typeof callId !== 'string' || callId.length === 0 || callId.length > 128) {
+    return { outcome: 'rejected', reason: 'INVALID_CALL' };
+  }
+
+  const auth = await verifyBillingStaff(branchId);
+  if (!auth.ok) {
+    return { outcome: 'rejected', reason: auth.reason };
+  }
+
+  const callRef = adminDb.doc(`${auth.branchPath}/serviceCalls/${callId}`);
+  const snap = await callRef.get();
+  if (!snap.exists) {
+    return { outcome: 'rejected', reason: 'CALL_NOT_FOUND' };
+  }
+
+  await callRef.update({
+    status: 'resolved',
+    resolvedByUid: auth.uid,
+    resolvedAt: Date.now(),
+  });
+
+  return { outcome: 'resolved' };
+}
+
 export interface CloseSessionInput {
   branchId: string;
   sessionId: string;
