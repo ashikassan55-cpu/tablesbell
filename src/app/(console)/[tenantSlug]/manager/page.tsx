@@ -1,26 +1,33 @@
 import Link from 'next/link';
 import { requireStaffSession } from '@/server/services/resolve-staff-session';
-import { roleLabel } from '@/lib/console/staff-permissions';
+import { adminDb } from '@/lib/firebase/admin';
+import { getManagerOverview } from '@/server/services/manager-reports.service';
+import { ManagerShell } from '@/components/manager/manager-shell';
+import { OverviewDashboard } from '@/components/manager/overview-dashboard';
 
 /**
  * src/app/(console)/[tenantSlug]/manager/page.tsx
  *
- * The Manager hub — the landing surface a manager/owner is sent to after
- * PIN login when no explicit `?next=` was carried in (see
- * `staff-login-view.tsx`'s `roleHome`). Middleware already gates
- * `/manager/*`; this page enforces the manager/owner role on top and,
- * for anyone else with a valid session, links back to the shared
- * console instead of the four management tools.
+ * The Manager Console landing page: the "Executive Reports & Daily
+ * Performance" dashboard from the Stitch design, wrapped in the shared
+ * `ManagerShell`. `requireStaffSession` + a manager/owner role gate; a
+ * cashier/server/kitchen session with a valid cookie gets an
+ * explanatory panel inside the shell, not the numbers.
  */
 
-const TOOLS = [
-  { href: 'menu', title: 'Menu Maker', desc: 'Edit categories and items, publish a new menu version.' },
-  { href: 'tables', title: 'Tables & QR', desc: 'Add or disable tables, print QR table tents.' },
-  { href: 'staff', title: 'Staff Management', desc: 'Add staff, set roles and PINs, revoke access.' },
-  { href: 'settings', title: 'Store Settings', desc: 'Currency, VAT rate, receipt footer, display name.' },
-] as const;
+export const dynamic = 'force-dynamic';
 
-export default async function ManagerHubPage({
+async function branchName(tenantId: string, branchId: string): Promise<string> {
+  try {
+    const snap = await adminDb.doc(`tenants/${tenantId}/branches/${branchId}`).get();
+    const d = snap.data() as { name?: string; displayName?: string } | undefined;
+    return d?.name || d?.displayName || 'Branch';
+  } catch {
+    return 'Branch';
+  }
+}
+
+export default async function ManagerOverviewPage({
   params,
 }: {
   params: Promise<{ tenantSlug: string }>;
@@ -28,51 +35,57 @@ export default async function ManagerHubPage({
   const { tenantSlug } = await params;
   const session = await requireStaffSession(tenantSlug);
   const isManager = session.role === 'manager' || session.role === 'owner';
+  const branchId = session.bids[0] ?? null;
 
-  return (
-    <div className="flex min-h-dvh flex-col bg-[#F3F4F6]">
-      <header className="flex items-center justify-between border-b border-[#E5E7EB] bg-white px-4 py-3">
-        <div>
-          <h1 className="text-lg font-bold text-[#1F2937]">Manager Console</h1>
-          <p className="text-xs text-[#6B7280]">
-            {tenantSlug} · {session.displayName} ({roleLabel(session.role)})
+  if (!isManager || !branchId) {
+    return (
+      <ManagerShell
+        tenantSlug={tenantSlug}
+        displayName={session.displayName}
+        role={session.role}
+        active="overview"
+      >
+        <div className="mx-auto max-w-md rounded-lg border border-[#E5E7EB] bg-white p-6 text-center">
+          <p className="text-sm font-semibold text-[#1F2937]">
+            {isManager ? 'No branch assigned' : 'Manager access required'}
+          </p>
+          <p className="mt-1 text-sm text-[#6B7280]">
+            {isManager ? (
+              'Your account has no branch assigned. Contact an owner.'
+            ) : (
+              <>
+                Reports are limited to managers and owners.{' '}
+                <Link href={`/${tenantSlug}/cashier`} className="font-semibold text-[#0F5257] underline">
+                  Go to the console
+                </Link>
+                .
+              </>
+            )}
           </p>
         </div>
-        <Link
-          href={`/${tenantSlug}/cashier`}
-          className="flex h-10 items-center rounded-lg border border-[#E5E7EB] px-3 text-sm font-semibold text-[#1F2937]"
-        >
-          Back to console
-        </Link>
-      </header>
+      </ManagerShell>
+    );
+  }
 
-      <div className="flex-1 px-4 py-4">
-        {isManager ? (
-          <div className="mx-auto grid max-w-3xl gap-3 sm:grid-cols-2">
-            {TOOLS.map((tool) => (
-              <Link
-                key={tool.href}
-                href={`/${tenantSlug}/manager/${tool.href}`}
-                className="rounded-lg border border-[#E5E7EB] bg-white p-5 transition-colors hover:border-[#0F5257]"
-              >
-                <p className="text-sm font-bold text-[#1F2937]">{tool.title}</p>
-                <p className="mt-1 text-sm text-[#6B7280]">{tool.desc}</p>
-              </Link>
-            ))}
-          </div>
-        ) : (
-          <div className="mx-auto max-w-md rounded-lg border border-[#E5E7EB] bg-white p-6 text-center">
-            <p className="text-sm font-semibold text-[#1F2937]">Manager access required</p>
-            <p className="mt-1 text-sm text-[#6B7280]">
-              This area is limited to managers and owners.{' '}
-              <Link href={`/${tenantSlug}/cashier`} className="font-semibold text-[#0F5257] underline">
-                Go to the console
-              </Link>
-              .
-            </p>
-          </div>
-        )}
-      </div>
-    </div>
+  const [name, overview] = await Promise.all([
+    branchName(session.tid, branchId),
+    getManagerOverview(session.tid, branchId),
+  ]);
+
+  return (
+    <ManagerShell
+      tenantSlug={tenantSlug}
+      displayName={session.displayName}
+      role={session.role}
+      active="overview"
+      branchName={name}
+      statusRight={
+        <span className="tabular-nums">
+          {overview.today.orderCount} orders today · {overview.openTables} open
+        </span>
+      }
+    >
+      <OverviewDashboard tenantSlug={tenantSlug} branchName={name} data={overview} />
+    </ManagerShell>
   );
 }

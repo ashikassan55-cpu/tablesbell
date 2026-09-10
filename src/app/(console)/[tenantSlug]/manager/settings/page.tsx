@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
-import Link from 'next/link';
 import { requireStaffSession } from '@/server/services/resolve-staff-session';
-import { canManageSettings, roleLabel } from '@/lib/console/staff-permissions';
+import { canManageSettings } from '@/lib/console/staff-permissions';
+import { ManagerShell } from '@/components/manager/manager-shell';
 import { StoreSettingsView } from '@/components/manager/store-settings-view';
 
 /**
@@ -23,23 +23,15 @@ export default async function ManagerSettingsPage({
   const branchId = session.bids[0] ?? null;
 
   const shell = (body: ReactNode) => (
-    <div className="flex min-h-dvh flex-col bg-[#F3F4F6]">
-      <header className="flex items-center justify-between border-b border-[#E5E7EB] bg-white px-4 py-3">
-        <div>
-          <h1 className="text-lg font-bold text-[#1F2937]">Store Settings</h1>
-          <p className="text-xs text-[#6B7280]">
-            {tenantSlug} · {session.displayName} ({roleLabel(session.role)})
-          </p>
-        </div>
-        <Link
-          href={`/${tenantSlug}/manager`}
-          className="flex h-10 items-center rounded-lg border border-[#E5E7EB] px-3 text-sm font-semibold text-[#1F2937]"
-        >
-          Back to Manager Console
-        </Link>
-      </header>
-      <div className="flex-1 px-4 py-4">{body}</div>
-    </div>
+    <ManagerShell
+      tenantSlug={tenantSlug}
+      displayName={session.displayName}
+      role={session.role}
+      active="settings"
+      title="Store Settings"
+    >
+      {body}
+    </ManagerShell>
   );
 
   if (!canManageSettings({ role: session.role, overrideAuth: session.overrideAuth })) {
