@@ -110,20 +110,21 @@ export function PlatformLoginForm() {
   const busy = state.status === 'busy';
 
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-[#1E1B19] px-6 font-body">
+    <div className="flex min-h-dvh items-center justify-center bg-[#27313F] px-6 font-body">
       <div className="w-full max-w-sm">
-        <div className="mb-6 text-center">
-          <span className="font-heading text-2xl font-extrabold tracking-tight text-[#F7EFEC]">
-            Table<span className="text-[#E85D3F]">Bells</span>
+        <div className="mb-6 flex items-center justify-center gap-2 rounded-sm bg-[#003A3E] px-4 py-3">
+          <span className="font-heading text-lg font-bold tracking-tight text-white">TableBells</span>
+          <span className="rounded-sm bg-[#0F5257] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-[#89C4C9]">
+            Founder
           </span>
-          <p className="mt-1 flex items-center justify-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[#8D716B]">
-            <ShieldCheck className="h-3.5 w-3.5" />
-            Founder Console
-          </p>
         </div>
 
-        <div className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-[#2A2422] p-6">
-          <p className="text-sm text-[#C9BDB8]">
+        <div className="flex flex-col gap-4 rounded border border-white/10 bg-[#31404E] p-6">
+          <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-[#8D9AAA]">
+            <ShieldCheck className="h-3.5 w-3.5" />
+            Platform access
+          </p>
+          <p className="text-sm text-[#C9D3E0]">
             Sign in with the Google account authorised for this platform.
           </p>
 
@@ -131,20 +132,20 @@ export function PlatformLoginForm() {
             type="button"
             onClick={signIn}
             disabled={busy}
-            className="flex items-center justify-center gap-2.5 rounded-lg bg-white px-4 py-2.5 text-sm font-bold text-[#1E1B19] transition-opacity hover:opacity-90 disabled:opacity-60"
+            className="flex items-center justify-center gap-2.5 rounded-sm bg-white px-4 py-2.5 text-sm font-bold text-[#121C2A] transition-opacity hover:opacity-90 disabled:opacity-60"
           >
-            {busy ? <Loader2 className="h-4 w-4 animate-spin text-[#8D716B]" /> : <GoogleMark />}
+            {busy ? <Loader2 className="h-4 w-4 animate-spin text-[#707979]" /> : <GoogleMark />}
             {busy ? 'Signing in…' : 'Sign in with Google'}
           </button>
 
           {state.status === 'error' ? (
-            <p role="alert" className="text-sm font-semibold text-[#F87171]">
+            <p role="alert" className="text-sm font-semibold text-[#FFB4AB]">
               {state.message}
             </p>
           ) : null}
         </div>
 
-        <p className="mt-4 text-center text-xs text-[#8D716B]">
+        <p className="mt-4 text-center text-xs text-[#8D9AAA]">
           Access is limited to one allowlisted Google account.
         </p>
       </div>

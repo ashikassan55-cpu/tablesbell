@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, ExternalLink } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Store, Building2, CalendarClock, Mail, IdCard } from 'lucide-react';
 import { requirePlatformSession } from '@/server/services/resolve-platform-session';
 import { getTenant } from '@/server/services/tenant.service';
+import { adminDb } from '@/lib/firebase/admin';
 import { PlatformShell } from '@/components/platform/platform-shell';
 import { TenantPlanControls } from '@/components/platform/tenant-plan-controls';
 import { TenantStatusControls } from '@/components/platform/tenant-status-controls';
@@ -18,23 +19,29 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 
 const STATUS_BADGE: Record<TenantStatus, string> = {
-  trial: 'bg-[#FFE7D6] text-[#8E4E14]',
-  active: 'bg-[#DDF3E4] text-[#1E6751]',
-  past_due: 'bg-[#FDECEC] text-[#B4231F]',
-  suspended: 'bg-[#FDECEC] text-[#B4231F]',
-  churned: 'bg-[#E8E1DE] text-[#59413C]',
+  trial: 'bg-[#FFDCC3] text-[#7A3E00]',
+  active: 'bg-[#A1F0C7] text-[#1D704F]',
+  past_due: 'bg-[#FFDAD6] text-[#93000A]',
+  suspended: 'bg-[#FFDAD6] text-[#93000A]',
+  churned: 'bg-[#DEE9FC] text-[#404849]',
 };
 
-export default async function TenantDetailPage({
-  params,
-}: {
-  params: Promise<{ tenantId: string }>;
-}) {
+async function countBranches(tenantId: string): Promise<number> {
+  try {
+    const snap = await adminDb.collection(`tenants/${tenantId}/branches`).get();
+    return snap.size;
+  } catch {
+    return 0;
+  }
+}
+
+export default async function TenantDetailPage({ params }: { params: Promise<{ tenantId: string }> }) {
   const { tenantId } = await params;
   const session = await requirePlatformSession();
   const tenant = await getTenant(tenantId);
   if (!tenant) notFound();
 
+  const branchCount = await countBranches(tenant.id);
   const meta = planMeta(tenant.subscription?.plan);
   const sub = tenant.subscription ?? {
     plan: 'starter' as const,
@@ -46,69 +53,95 @@ export default async function TenantDetailPage({
 
   return (
     <PlatformShell email={session.email} active="tenants">
-      <Link href="/admin" className="mb-4 inline-flex items-center gap-1 text-sm font-semibold text-[#E85D3F]">
-        <ArrowLeft className="h-4 w-4" /> Directory
+      <Link href="/admin" className="mb-4 inline-flex items-center gap-1 text-sm font-semibold text-[#003A3E]">
+        <ArrowLeft className="h-4 w-4" /> Back to Tenant Directory
       </Link>
 
-      <div className="rounded-xl border border-[#E0BFB8] bg-white p-6 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+      {/* Header */}
+      <section className="flex flex-col gap-4 rounded border border-[#D9E3F6] bg-white p-5 shadow-sm xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex items-start gap-4">
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded bg-[#003A3E] text-white">
+            <Store className="h-7 w-7" />
+          </span>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="font-heading text-2xl font-bold tracking-tight text-[#1E1B19]">{tenant.name}</h1>
-              <span
-                className={`rounded px-2 py-0.5 text-xs font-bold uppercase ${STATUS_BADGE[tenant.status] ?? ''}`}
-              >
+              <h1 className="font-heading text-xl font-bold tracking-tight text-[#121C2A]">{tenant.name}</h1>
+              <span className={`rounded-sm px-2 py-0.5 text-[10px] font-bold uppercase ${STATUS_BADGE[tenant.status] ?? ''}`}>
                 {tenant.status}
               </span>
-              <span className="rounded bg-[#F4ECE9] px-2 py-0.5 font-mono text-xs text-[#59413C]">
+              <span className="rounded-sm bg-[#EFF4FF] px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-[#404849]">
                 {tenant.id}
               </span>
             </div>
-            <p className="mt-1 text-sm text-[#59413C]">
-              <span className="font-mono">/{tenant.slug}</span> · {tenant.city || 'UAE'} · owner {tenant.ownerName}
-            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#404849]">
+              <span className="font-mono font-semibold text-[#003A3E]">/{tenant.slug}</span>
+              <span className="text-[#BFC8C9]">•</span>
+              <span>Created {tenant.createdAt ? new Date(tenant.createdAt).toLocaleDateString('en-AE') : '—'}</span>
+              <span className="text-[#BFC8C9]">•</span>
+              <span>{branchCount} branch{branchCount === 1 ? '' : 'es'}</span>
+            </div>
           </div>
-          <Link
-            href={`/${tenant.slug}/lock`}
-            target="_blank"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[#F4ECE9] px-3 py-2 text-sm font-semibold text-[#1E1B19] hover:bg-[#EEE7E3]"
-          >
-            Open staff login <ExternalLink className="h-3.5 w-3.5" />
-          </Link>
         </div>
+        <Link
+          href={`/${tenant.slug}/lock`}
+          target="_blank"
+          className="inline-flex h-11 items-center gap-1.5 self-start rounded-sm border border-[#BFC8C9] bg-[#EFF4FF] px-3 text-sm font-semibold text-[#121C2A] hover:bg-[#DEE9FC] xl:self-center"
+        >
+          Open staff login <ExternalLink className="h-3.5 w-3.5" />
+        </Link>
+      </section>
 
-        {tenant.status === 'suspended' && tenant.suspendReason ? (
-          <p className="mt-3 rounded-lg bg-[#FDECEC] px-3 py-2 text-sm text-[#7A1E22]">
-            Suspended: {tenant.suspendReason}
-          </p>
-        ) : null}
+      {tenant.status === 'suspended' && tenant.suspendReason ? (
+        <p className="mt-3 rounded-sm bg-[#FFDAD6] px-3 py-2 text-sm text-[#7A1E22]">
+          Suspended: {tenant.suspendReason}
+        </p>
+      ) : null}
 
-        <dl className="mt-5 grid gap-4 text-sm sm:grid-cols-3">
-          <Cell k="Legal entity" v={tenant.legalEntity || '—'} />
-          <Cell k="TRN" v={tenant.trn || '—'} mono />
-          <Cell k="Owner email" v={tenant.ownerEmail || '—'} />
-          <Cell k="Primary branch" v={tenant.primaryBranchId || '—'} mono />
-          <Cell k="Created" v={tenant.createdAt ? new Date(tenant.createdAt).toLocaleDateString('en-AE') : '—'} />
-          <Cell
-            k="Current plan"
-            v={`${meta.name} · AED ${sub.monthlyFeeAed}/mo · ${sub.billingStatus}`}
-          />
-        </dl>
+      {/* Profile + plan */}
+      <div className="mt-4 grid gap-4 xl:grid-cols-2">
+        <section className="rounded border border-[#D9E3F6] bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-2 pb-3">
+            <IdCard className="h-5 w-5 text-[#003A3E]" />
+            <h2 className="font-heading text-base font-bold text-[#121C2A]">Restaurant profile</h2>
+          </div>
+          <dl className="grid gap-2">
+            <Spec icon={Building2} k="Legal entity" v={tenant.legalEntity || '—'} />
+            <Spec icon={IdCard} k="Tax registration (TRN)" v={tenant.trn || '—'} mono />
+            <Spec icon={Store} k="Owner" v={tenant.ownerName || '—'} />
+            <Spec icon={Mail} k="Owner email" v={tenant.ownerEmail || '—'} />
+            <Spec icon={Building2} k="Primary branch" v={tenant.primaryBranchId || '—'} mono />
+            <Spec icon={CalendarClock} k="City" v={tenant.city || 'UAE'} />
+          </dl>
+        </section>
+
+        <TenantPlanControls tenantId={tenant.id} subscription={sub} />
       </div>
 
-      <div className="mt-5 grid gap-5 lg:grid-cols-2">
-        <TenantPlanControls tenantId={tenant.id} subscription={sub} />
+      <div className="mt-4">
         <TenantStatusControls tenantId={tenant.id} status={tenant.status} />
       </div>
     </PlatformShell>
   );
 }
 
-function Cell({ k, v, mono }: { k: string; v: string; mono?: boolean }) {
+function Spec({
+  icon: Icon,
+  k,
+  v,
+  mono,
+}: {
+  icon: typeof Store;
+  k: string;
+  v: string;
+  mono?: boolean;
+}) {
   return (
-    <div>
-      <dt className="text-xs uppercase tracking-wide text-[#8D716B]">{k}</dt>
-      <dd className={`mt-0.5 text-[#1E1B19] ${mono ? 'font-mono' : ''}`}>{v}</dd>
+    <div className="flex items-start gap-2 rounded-sm bg-[#EFF4FF] p-2.5">
+      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-[#707979]" />
+      <div className="min-w-0">
+        <dt className="text-[10px] font-bold uppercase tracking-wide text-[#707979]">{k}</dt>
+        <dd className={`text-sm text-[#121C2A] ${mono ? 'font-mono' : ''}`}>{v}</dd>
+      </div>
     </div>
   );
 }

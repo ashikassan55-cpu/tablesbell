@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function PlatformLoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-dvh bg-[#1E1B19]" />}>
+    <Suspense fallback={<div className="min-h-dvh bg-[#27313F]" />}>
       <PlatformLoginForm />
     </Suspense>
   );

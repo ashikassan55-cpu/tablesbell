@@ -16,11 +16,18 @@ export function PlatformSignOut() {
       onClick={() =>
         start(async () => {
           await platformSignOut();
+          try {
+            const { signOut } = await import('firebase/auth');
+            const { auth } = await import('@/lib/firebase/client');
+            await signOut(auth);
+          } catch {
+            /* ignore */
+          }
           router.push('/admin/login');
           router.refresh();
         })
       }
-      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-[#C9BDB8] transition-colors hover:bg-white/10 hover:text-white disabled:opacity-50"
+      className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-sm font-semibold text-[#C9D3E0] transition-colors hover:bg-white/5 hover:text-white disabled:opacity-50"
     >
       <LogOut className="h-4 w-4" />
       {pending ? 'Signing out…' : 'Sign out'}

@@ -14,10 +14,10 @@ export default async function NewTenantPage() {
   const session = await requirePlatformSession();
   return (
     <PlatformShell email={session.email} active="tenants">
-      <h1 className="mb-1 font-heading text-2xl font-bold tracking-tight text-[#1E1B19]">
+      <h1 className="mb-1 font-heading text-xl font-bold tracking-tight text-[#121C2A]">
         Onboard a restaurant
       </h1>
-      <p className="mb-5 text-sm text-[#59413C]">
+      <p className="mb-5 text-sm text-[#404849]">
         Creates the tenant, its first branch (empty menu), and the first owner PIN account.
       </p>
       <NewTenantForm />

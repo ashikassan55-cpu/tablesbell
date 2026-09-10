@@ -5,8 +5,7 @@
  *
  * Founder onboarding: one form → `createTenant`, which writes the tenant,
  * its first branch (empty menu), and the first owner account with a PIN.
- * On success it shows the owner's sign-in details — the founder passes
- * these to the restaurant.
+ * On success it shows the owner's sign-in details.
  */
 
 import { useState, type FormEvent } from 'react';
@@ -17,7 +16,7 @@ import { createTenant, type CreateTenantResult } from '@/server/actions/platform
 import { PLAN_IDS, planMeta } from '@/lib/platform/plans';
 
 const FIELD =
-  'w-full rounded-lg border border-[#E0BFB8] bg-white px-3 py-2.5 text-sm text-[#1E1B19] outline-none focus:ring-2 focus:ring-[#E85D3F]';
+  'w-full rounded-sm border border-[#BFC8C9] bg-white px-3 py-2.5 text-sm text-[#121C2A] outline-none focus:border-[#0F5257]';
 
 export function NewTenantForm() {
   const router = useRouter();
@@ -53,10 +52,10 @@ export function NewTenantForm() {
 
   if (done) {
     return (
-      <div className="rounded-xl border border-[#3B8169]/30 bg-[#DDF3E4] p-6">
+      <div className="rounded border border-[#A1F0C7] bg-[#EAF7EF] p-6">
         <div className="flex items-center gap-2">
-          <CheckCircle2 className="h-6 w-6 text-[#1E6751]" />
-          <h2 className="font-heading text-lg font-bold text-[#1E1B19]">Restaurant onboarded</h2>
+          <CheckCircle2 className="h-6 w-6 text-[#176B4B]" />
+          <h2 className="font-heading text-lg font-bold text-[#121C2A]">Restaurant onboarded</h2>
         </div>
         <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
           <Row k="Tenant ID" v={done.tenantId} mono />
@@ -64,21 +63,20 @@ export function NewTenantForm() {
           <Row k="Owner staff code" v={done.ownerStaffCode} mono />
           <Row k="Owner PIN" v="(the PIN you just set)" />
         </dl>
-        <p className="mt-4 text-sm text-[#1E6751]">
-          Give the owner their login URL, staff code and PIN. They sign in, then add their menu, tables
-          and staff from the manager console. The account starts on <strong>trial</strong> — set the
-          plan and mark it paid from its detail page.
+        <p className="mt-4 text-sm text-[#1D704F]">
+          Give the owner their login URL, staff code and PIN. The account starts on <strong>trial</strong> —
+          set the plan and mark it paid from its detail page.
         </p>
         <div className="mt-4 flex gap-2">
           <Link
             href={`/admin/tenants/${done.tenantId}`}
-            className="rounded-lg bg-[#E85D3F] px-4 py-2 text-sm font-bold text-white hover:bg-[#d24e33]"
+            className="rounded-sm bg-[#003A3E] px-4 py-2 text-sm font-bold text-white hover:bg-[#0F5257]"
           >
             Open detail page
           </Link>
           <Link
             href="/admin"
-            className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-[#1E1B19] ring-1 ring-[#E0BFB8]"
+            className="rounded-sm border border-[#BFC8C9] bg-white px-4 py-2 text-sm font-semibold text-[#121C2A]"
           >
             Back to directory
           </Link>
@@ -88,8 +86,8 @@ export function NewTenantForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="rounded-xl border border-[#E0BFB8] bg-white p-6 shadow-sm">
-      <Link href="/admin" className="mb-4 inline-flex items-center gap-1 text-sm font-semibold text-[#E85D3F]">
+    <form onSubmit={onSubmit} className="rounded border border-[#D9E3F6] bg-white p-6 shadow-sm">
+      <Link href="/admin" className="mb-4 inline-flex items-center gap-1 text-sm font-semibold text-[#003A3E]">
         <ArrowLeft className="h-4 w-4" /> Directory
       </Link>
 
@@ -127,8 +125,8 @@ export function NewTenantForm() {
         </Field>
       </div>
 
-      <div className="mt-5 border-t border-[#F4ECE9] pt-5">
-        <p className="mb-3 text-xs font-bold uppercase tracking-wide text-[#8D716B]">First owner account</p>
+      <div className="mt-5 border-t border-[#EFF4FF] pt-5">
+        <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-[#707979]">First owner account</p>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Owner name">
             <input name="ownerName" required maxLength={120} placeholder="Tariq Al-Mansoor" className={FIELD} />
@@ -146,7 +144,7 @@ export function NewTenantForm() {
       </div>
 
       {err ? (
-        <p role="alert" className="mt-4 text-sm font-semibold text-[#B4231F]">
+        <p role="alert" className="mt-4 text-sm font-semibold text-[#93000A]">
           {err}
         </p>
       ) : null}
@@ -154,7 +152,7 @@ export function NewTenantForm() {
       <button
         type="submit"
         disabled={busy}
-        className="mt-5 flex items-center justify-center gap-2 rounded-lg bg-[#E85D3F] px-6 py-3 text-sm font-bold text-white hover:bg-[#d24e33] disabled:opacity-60"
+        className="mt-5 inline-flex items-center justify-center gap-2 rounded-sm bg-[#003A3E] px-6 py-3 text-sm font-bold text-white hover:bg-[#0F5257] disabled:opacity-60"
       >
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
         {busy ? 'Creating…' : 'Create restaurant'}
@@ -166,9 +164,9 @@ export function NewTenantForm() {
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-sm font-semibold text-[#1E1B19]">
+      <span className="text-xs font-bold uppercase tracking-wide text-[#404849]">
         {label}
-        {hint ? <span className="ml-1 font-normal text-[#8D716B]">· {hint}</span> : null}
+        {hint ? <span className="ml-1 font-normal normal-case text-[#707979]">· {hint}</span> : null}
       </span>
       {children}
     </label>
@@ -178,8 +176,8 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 function Row({ k, v, mono }: { k: string; v: string; mono?: boolean }) {
   return (
     <div>
-      <dt className="text-xs uppercase tracking-wide text-[#59413C]">{k}</dt>
-      <dd className={`text-[#1E1B19] ${mono ? 'font-mono' : ''}`}>{v}</dd>
+      <dt className="text-[10px] font-bold uppercase tracking-wide text-[#404849]">{k}</dt>
+      <dd className={`text-[#121C2A] ${mono ? 'font-mono' : ''}`}>{v}</dd>
     </div>
   );
 }
