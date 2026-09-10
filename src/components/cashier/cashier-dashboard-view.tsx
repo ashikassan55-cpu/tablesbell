@@ -27,8 +27,16 @@ import {
 import { ClockProvider } from '@/components/providers/clock-provider';
 import { TableOverviewGrid } from './table-overview-grid';
 import { TableDetailPanel } from './table-detail-panel';
-import { AlertsInbox } from './alerts-inbox';
 import { ExecuteBanDialog } from './execute-ban-dialog';
+import { OrderDispatchFeed } from './order-dispatch-feed';
+import { AlarmBar } from './alarm-bar';
+import { AlertsPagersView } from './alerts-pagers-view';
+import {
+  callToActiveAlert,
+  staffToActiveAlert,
+  sortActiveAlerts,
+  type ActiveAlert,
+} from './active-alert';
 import { LockSwitchButton } from '@/components/console/lock-switch-button';
 import { voidTicketLine, resolveStaffAlert } from '@/server/actions/bill.actions';
 import { roleLabel, type StaffIdentity } from '@/lib/console/staff-permissions';
@@ -104,6 +112,14 @@ function Body({
   const selectedTableOrders = selectedTable ? live.orders.filter((o) => o.tableId === selectedTable.id) : [];
   const visibleAlerts = live.alerts.filter((a) => !dismissedAlertIds.has(a.id));
 
+  /** Waiter calls + open staff alerts, one normalized list, most urgent first. */
+  const activeAlerts = sortActiveAlerts([
+    ...live.tables
+      .filter((t) => t.activeCall && !dismissedAlertIds.has(`call:${t.id}`))
+      .map((t) => callToActiveAlert(t)),
+    ...visibleAlerts.map((a) => staffToActiveAlert(a)),
+  ]);
+
   const zones = useMemo(() => {
     const s = new Set<string>();
     for (const t of live.tables) s.add(t.zoneId || 'unzoned');
@@ -135,6 +151,30 @@ function Body({
       });
       setVoidStatus({ orderCode: alert.tableCode, message: `Couldn't dismiss alert: ${result.reason}.`, tone: 'error' });
     }
+  }
+
+  /** "Attending" — silence the alarm on this console; the alert stays open. */
+  function acknowledgeAlert(alert: ActiveAlert) {
+    setDismissedAlertIds((prev) => new Set(prev).add(alert.key));
+  }
+
+  /** "Attended" — clear the alert. Staff alerts hit the real server action;
+   *  waiter calls have no backend clear yet, so they resolve on this console. */
+  function resolveActiveAlert(alert: ActiveAlert) {
+    if (alert.staffAlert) {
+      void resolveAlert(alert.staffAlert);
+      return;
+    }
+    setDismissedAlertIds((prev) => new Set(prev).add(alert.key));
+    setVoidStatus({
+      orderCode: alert.tableCode,
+      message: 'Runner dispatched — call cleared on this console.',
+      tone: 'ok',
+    });
+  }
+
+  function reviewActiveAlert(alert: ActiveAlert) {
+    if (alert.staffAlert) setReviewingAlert(alert.staffAlert);
   }
 
   function handleHandleCall(tableId: string) {
@@ -173,7 +213,7 @@ function Body({
   ];
   const RAIL: { id: Tab | 'roster' | 'settings' | 'sos'; icon: typeof LayoutGrid; label: string; dot?: boolean }[] = [
     { id: 'floor', icon: LayoutGrid, label: 'Floor map' },
-    { id: 'alerts', icon: BellRing, label: 'Service bell calls', dot: visibleAlerts.length > 0 },
+    { id: 'alerts', icon: BellRing, label: 'Service bell calls', dot: activeAlerts.length > 0 },
     { id: 'queue', icon: Monitor, label: 'Live docket' },
     { id: 'roster', icon: IdCard, label: 'Staff roster' },
   ];
@@ -195,7 +235,7 @@ function Body({
             <span className="h-2 w-2 animate-pulse rounded-full bg-[#10B981]" /> Service active
           </span>
           <span className="hidden items-center gap-1.5 rounded-xl bg-[#E6EEFF] px-2.5 py-1 text-[10px] font-bold uppercase xl:inline-flex">
-            <span className="text-[#EF4444]">{visibleAlerts.length} alerts</span>
+            <span className="text-[#EF4444]">{activeAlerts.length} alerts</span>
             <span className="text-[#BFC8C9]">•</span>
             <span className="text-[#176B4B]">{occupied} tables open</span>
           </span>
@@ -265,6 +305,16 @@ function Body({
 
       {/* Content */}
       <div className="pl-16 pt-14">
+        {/* Persistent alarm bar — shows on every tab until acknowledged / resolved */}
+        {activeAlerts.length > 0 ? (
+          <AlarmBar
+            count={activeAlerts.length}
+            sinceMs={activeAlerts[0].createdAt}
+            terminalLabel={`${tenantSlug} console`}
+            onOpen={() => setTab('alerts')}
+          />
+        ) : null}
+
         {/* Toolbar */}
         <div className="flex flex-wrap items-center gap-2 bg-[#EFF4FF] px-4 py-3 shadow-sm">
           <StatPill label="Capacity" value={`${live.tables.length} tables`} />
@@ -338,27 +388,28 @@ function Body({
           ) : null}
 
           {tab === 'alerts' ? (
-            <section>
-              <h2 className="mb-2 text-[10px] font-bold uppercase tracking-widest text-[#6B7280]">
-                Service bell calls &amp; pagers
-              </h2>
-              {visibleAlerts.length === 0 ? (
-                <p className="rounded-xl border border-[#E5E7EB] bg-white px-4 py-10 text-center text-sm text-[#6B7280]">
-                  No open alerts. All tables are quiet.
-                </p>
-              ) : (
-                <AlertsInbox
-                  alerts={visibleAlerts}
-                  staff={staff}
-                  onReview={setReviewingAlert}
-                  onResolve={resolveAlert}
-                />
-              )}
-            </section>
+            <AlertsPagersView
+              activeAlerts={activeAlerts}
+              tables={live.tables}
+              orders={live.orders}
+              staff={staff}
+              money={money}
+              onAcknowledge={acknowledgeAlert}
+              onResolve={resolveActiveAlert}
+              onReview={reviewActiveAlert}
+              onOpenTable={setSelectedTableId}
+            />
           ) : null}
 
           {tab === 'queue' ? (
-            <OrderQueue orders={live.orders} money={money} onSelectTable={setSelectedTableId} />
+            <OrderDispatchFeed
+              orders={live.orders}
+              liveStatus={live.status}
+              staff={staff}
+              branchId={branchId}
+              tenantSlug={tenantSlug}
+              onSelectTable={setSelectedTableId}
+            />
           ) : null}
 
           {tab === 'shift' ? (
@@ -416,68 +467,6 @@ function ZoneTab({ active, onClick, children }: { active: boolean; onClick: () =
     >
       {children}
     </button>
-  );
-}
-
-interface QueueOrder {
-  id: string;
-  code: string;
-  tableCode: string;
-  tableId: string;
-  status: string;
-  grossFils: number;
-  items: { qty: number }[];
-}
-
-function OrderQueue({
-  orders,
-  money,
-  onSelectTable,
-}: {
-  orders: QueueOrder[];
-  money: (fils: number) => string;
-  onSelectTable: (id: string) => void;
-}) {
-  if (orders.length === 0) {
-    return (
-      <p className="rounded-xl border border-[#E5E7EB] bg-white px-4 py-10 text-center text-sm text-[#6B7280]">
-        No open tickets right now.
-      </p>
-    );
-  }
-  return (
-    <div className="overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-sm">
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr className="bg-[#EFF4FF] text-[10px] uppercase tracking-widest text-[#6B7280]">
-            <th className="px-4 py-3 font-bold">Ticket</th>
-            <th className="px-3 py-3 font-bold">Table</th>
-            <th className="px-3 py-3 font-bold">Items</th>
-            <th className="px-3 py-3 font-bold">Status</th>
-            <th className="px-4 py-3 text-right font-bold">Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          {orders.map((o) => (
-            <tr
-              key={o.id}
-              onClick={() => onSelectTable(o.tableId)}
-              className="cursor-pointer border-t border-[#F3F4F6] hover:bg-[#EFF4FF]/60"
-            >
-              <td className="px-4 py-3 font-mono font-semibold text-[#1F2937]">#{o.code}</td>
-              <td className="px-3 py-3 text-[#4B5563]">{o.tableCode}</td>
-              <td className="px-3 py-3 text-[#4B5563]">{o.items.reduce((n, it) => n + (it.qty || 0), 0)}</td>
-              <td className="px-3 py-3">
-                <span className="rounded bg-[#E6EEFF] px-2 py-0.5 text-[10px] font-bold uppercase text-[#003A3E]">
-                  {o.status}
-                </span>
-              </td>
-              <td className="px-4 py-3 text-right font-bold tabular-nums text-[#1F2937]">{money(o.grossFils)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
   );
 }
 
