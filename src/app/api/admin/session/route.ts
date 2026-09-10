@@ -69,10 +69,25 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const token = await signPlatformSessionToken({
-    uid: decoded.uid,
-    email: typeof decoded.email === 'string' ? decoded.email : decoded.uid,
-  });
+  let token: string;
+  try {
+    token = await signPlatformSessionToken({
+      uid: decoded.uid,
+      email: typeof decoded.email === 'string' ? decoded.email : decoded.uid,
+    });
+  } catch (error) {
+    // Almost always: PLATFORM_SESSION_SECRET is not set in this
+    // environment. Say so plainly instead of a bare 500.
+    console.error('[admin/session] could not sign the platform cookie:', error);
+    return NextResponse.json(
+      {
+        outcome: 'error',
+        message:
+          'The founder session secret is not configured on the server (PLATFORM_SESSION_SECRET). Add it and redeploy.',
+      },
+      { status: 500 },
+    );
+  }
 
   const response = NextResponse.json({ outcome: 'ok' });
   response.cookies.set(PLATFORM_SESSION_COOKIE_NAME, token, PLATFORM_SESSION_COOKIE_OPTIONS);
